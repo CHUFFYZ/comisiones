@@ -341,20 +341,24 @@ Usar utilidades: `fs-6`, `small`, `fw-semibold`, `text-uppercase`, `text-seconda
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 
--- Volcando estructura de base de datos para comisiones
-CREATE DATABASE IF NOT EXISTS `comisiones` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
-USE `comisiones`;
+-- Volcando estructura de base de datos para cati
+CREATE DATABASE IF NOT EXISTS `cati` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `cati`;
 
--- Volcando estructura para tabla comisiones.asignacion_permiso
+-- Volcando estructura para tabla cati.asignacion_permiso
 CREATE TABLE IF NOT EXISTS `asignacion_permiso` (
   `Id` int unsigned NOT NULL AUTO_INCREMENT,
   `Clave` varchar(50) DEFAULT NULL,
   `Nombre` varchar(50) DEFAULT NULL,
-  `Descripcion` varchar(50) DEFAULT NULL,
+  `Descripcion` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `IdUsuario` int NOT NULL,
+  `IdTipoPermiso` int NOT NULL,
+  `IdNivelAcceso` int NOT NULL,
+  `IdTipoPermisoTemp` int DEFAULT NULL,
+  `IdNivelAccesoTemp` int DEFAULT NULL,
+  `IniPermisoTemp` datetime DEFAULT NULL,
+  `FinPermisoTemp` datetime DEFAULT NULL,
   `Activo` tinyint DEFAULT NULL,
-  `IdUsuario` int DEFAULT NULL,
-  `IdTipoPermiso` int DEFAULT NULL,
-  `IdNivelAcceso` int DEFAULT NULL,
   `CreatedAt` datetime DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
   `DeletedAt` datetime DEFAULT NULL,
@@ -366,21 +370,29 @@ CREATE TABLE IF NOT EXISTS `asignacion_permiso` (
   KEY `FK_asignacion_permiso_usuario` (`IdUsuario`),
   KEY `FK_asignacion_permiso_nivel_acceso` (`IdNivelAcceso`),
   KEY `FK_asignacion_permiso_tipo_permiso` (`IdTipoPermiso`),
+  KEY `FK_asignacion_permiso_tipo_permiso_2` (`IdTipoPermisoTemp`),
+  KEY `FK_asignacion_permiso_nivel_acceso_2` (`IdNivelAccesoTemp`),
   CONSTRAINT `FK_asignacion_permiso_nivel_acceso` FOREIGN KEY (`IdNivelAcceso`) REFERENCES `nivel_acceso` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `FK_asignacion_permiso_nivel_acceso_2` FOREIGN KEY (`IdNivelAccesoTemp`) REFERENCES `nivel_acceso` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `FK_asignacion_permiso_tipo_permiso` FOREIGN KEY (`IdTipoPermiso`) REFERENCES `tipo_permiso` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `FK_asignacion_permiso_tipo_permiso_2` FOREIGN KEY (`IdTipoPermisoTemp`) REFERENCES `tipo_permiso` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `FK_asignacion_permiso_usuario` FOREIGN KEY (`IdUsuario`) REFERENCES `usuario` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Volcando datos para la tabla comisiones.asignacion_permiso: ~1 rows (aproximadamente)
-INSERT INTO `asignacion_permiso` (`Id`, `Clave`, `Nombre`, `Descripcion`, `Activo`, `IdUsuario`, `IdTipoPermiso`, `IdNivelAcceso`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
-	(1, NULL, NULL, 'Permiso 1 prueba', 1, 1, 4, 1, '2026-10-04 01:32:26', '2026-10-04 01:32:26', NULL, 'admin', 'admin', NULL, 1);
+-- Volcando datos para la tabla cati.asignacion_permiso: ~5 rows (aproximadamente)
+INSERT INTO `asignacion_permiso` (`Id`, `Clave`, `Nombre`, `Descripcion`, `IdUsuario`, `IdTipoPermiso`, `IdNivelAcceso`, `IdTipoPermisoTemp`, `IdNivelAccesoTemp`, `IniPermisoTemp`, `FinPermisoTemp`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
+	(1, 'APPN', NULL, 'Permiso 1 prueba area nelly: Asigancion de permiso Parcial Nelly', 1, 4, 1, NULL, NULL, NULL, NULL, 1, '2026-10-04 01:32:26', '2026-10-04 01:32:26', NULL, 'admin', 'admin', NULL, 1),
+	(2, 'APPE', NULL, 'Permiso 2 prueba area estrellita: Asigancion de permiso Parcial Estrellita', 2, 4, 2, NULL, NULL, NULL, NULL, 1, '2026-10-04 10:54:02', NULL, NULL, 'admin', NULL, NULL, 1),
+	(3, 'APPS', NULL, 'Permiso 3 prueba Saide: Asigancion depermiso Parcial Saide', 3, 4, 3, NULL, NULL, NULL, NULL, 1, '2026-10-04 10:55:50', NULL, NULL, 'admin', NULL, NULL, 1),
+	(4, 'APTSU', NULL, 'Permiso Total Super Usuario: asigancion de permiso Total Super Usuario', 5, 4, 4, NULL, NULL, NULL, NULL, 1, '2026-10-04 15:43:41', NULL, NULL, 'SUsuario', NULL, NULL, 1),
+	(5, 'APPA', NULL, 'Permiso Total Admin: asigancion de permiso Parcial Administdor', 6, 4, 5, NULL, NULL, NULL, NULL, 1, '2026-10-04 15:52:43', NULL, NULL, 'SUsuario', NULL, NULL, 1);
 
--- Volcando estructura para tabla comisiones.modulo
-CREATE TABLE IF NOT EXISTS `modulo` (
+-- Volcando estructura para tabla cati.facultad
+CREATE TABLE IF NOT EXISTS `facultad` (
   `Id` int NOT NULL AUTO_INCREMENT,
-  `Clave` int DEFAULT NULL,
+  `Clave` varchar(50) DEFAULT NULL,
   `Nombre` varchar(50) DEFAULT NULL,
-  `Descripcion` varchar(50) DEFAULT NULL,
+  `Descripcion` varchar(500) DEFAULT NULL,
   `Activo` tinyint DEFAULT NULL,
   `CreatedAt` datetime DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
@@ -390,18 +402,44 @@ CREATE TABLE IF NOT EXISTS `modulo` (
   `DeletedBy` varchar(50) DEFAULT NULL,
   `Versionn` int DEFAULT NULL,
   PRIMARY KEY (`Id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Volcando datos para la tabla comisiones.modulo: ~0 rows (aproximadamente)
+-- Volcando datos para la tabla cati.facultad: ~3 rows (aproximadamente)
+INSERT INTO `facultad` (`Id`, `Clave`, `Nombre`, `Descripcion`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
+	(1, 'FCI', 'Facultad de Ciencias de la Informacion', 'Facultad de Ciencias de la Informacion', 1, '2026-10-04 15:07:44', NULL, NULL, 'admin', NULL, NULL, 1),
+	(2, 'FCEA', 'Facultad de Ciencias Economico Administrativas', 'Facultad de Ciencias Economico Administrativas', 1, '2026-10-04 15:08:28', NULL, NULL, 'admin', NULL, NULL, 1),
+	(3, 'FGPSU', 'Facultad global', 'Facultad global con permiso de super usuario y admin', 1, NULL, NULL, NULL, 'admin', NULL, NULL, 1);
+
+-- Volcando estructura para tabla cati.modulo
+CREATE TABLE IF NOT EXISTS `modulo` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `Clave` varchar(50) DEFAULT NULL,
+  `Nombre` varchar(50) DEFAULT NULL,
+  `Descripcion` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `Activo` tinyint DEFAULT NULL,
+  `CreatedAt` datetime DEFAULT NULL,
+  `UpdatedAt` datetime DEFAULT NULL,
+  `DeletedAt` datetime DEFAULT NULL,
+  `CreatedBy` varchar(50) DEFAULT NULL,
+  `UpdatedBy` varchar(50) DEFAULT NULL,
+  `DeletedBy` varchar(50) DEFAULT NULL,
+  `Versionn` int DEFAULT NULL,
+  PRIMARY KEY (`Id`)
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- Volcando datos para la tabla cati.modulo: ~4 rows (aproximadamente)
 INSERT INTO `modulo` (`Id`, `Clave`, `Nombre`, `Descripcion`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
-	(1, NULL, 'Comisiones', 'Modulo de Comisiones Para Profesores y Secretarias', 1, '2026-10-04 00:04:28', '2026-10-04 00:04:28', NULL, 'admin', 'admin', NULL, 1);
+	(1, 'MSC', 'SisComisiones', 'Modulo de Comisiones Para Profesores y Secretarias', 1, '2026-10-04 00:04:28', '2026-10-04 00:04:28', NULL, 'admin', 'admin', NULL, 1),
+	(2, 'MP', 'CATI', 'Modulo principal para invitados y usuarios', 1, '2026-10-04 15:11:24', NULL, NULL, 'admin', NULL, NULL, 1),
+	(3, 'MGSU', 'Global', 'Modulo Global Acceso a todos super usuario', 1, '2026-10-04 15:31:48', NULL, NULL, 'SUsuario', NULL, NULL, 1),
+	(4, 'MA', 'Administracion', 'Modulo para el administrador', 1, '2026-10-04 15:35:10', NULL, NULL, 'SUsuario', NULL, NULL, 1);
 
--- Volcando estructura para tabla comisiones.nivel_acceso
+-- Volcando estructura para tabla cati.nivel_acceso
 CREATE TABLE IF NOT EXISTS `nivel_acceso` (
   `Id` int NOT NULL AUTO_INCREMENT,
   `Clave` varchar(50) DEFAULT NULL,
   `Nombre` varchar(50) DEFAULT NULL,
-  `Descripcion` varchar(50) DEFAULT NULL,
+  `Descripcion` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `IdModulo` int NOT NULL,
   `Activo` tinyint DEFAULT NULL,
   `CreatedAt` datetime DEFAULT NULL,
@@ -414,20 +452,22 @@ CREATE TABLE IF NOT EXISTS `nivel_acceso` (
   PRIMARY KEY (`Id`),
   KEY `FK_nivel_acceso_modulo` (`IdModulo`),
   CONSTRAINT `FK_nivel_acceso_modulo` FOREIGN KEY (`IdModulo`) REFERENCES `modulo` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Volcando datos para la tabla comisiones.nivel_acceso: ~0 rows (aproximadamente)
+-- Volcando datos para la tabla cati.nivel_acceso: ~5 rows (aproximadamente)
 INSERT INTO `nivel_acceso` (`Id`, `Clave`, `Nombre`, `Descripcion`, `IdModulo`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
-	(1, NULL, 'MCNA1', 'Nivel de acceso 1 del modulo de comisiones', 1, 1, '2026-10-04 01:14:58', '2026-10-04 01:15:00', NULL, 'admin', 'admin', NULL, 1),
-	(2, NULL, 'MCNA2', 'Nivel de acceso 2 del modulo de comisiones', 1, 1, '2026-10-04 01:17:18', '2026-10-04 01:17:20', NULL, 'admin', 'admin', NULL, 1),
-	(3, NULL, 'MCNA2', 'Nivel de acceso 3 del modulo de comisiones', 1, 1, '2026-10-04 01:17:59', '2026-10-04 01:18:00', NULL, 'admin', 'admin', NULL, 1);
+	(1, 'MCNA1', 'MCNA1', 'Nivel de acceso 1 del modulo de comisiones', 1, 1, '2026-10-04 01:14:58', '2026-10-04 01:15:00', NULL, 'admin', 'admin', NULL, 1),
+	(2, 'MCNA2', 'MCNA2', 'Nivel de acceso 2 del modulo de comisiones', 1, 1, '2026-10-04 01:17:18', '2026-10-04 01:17:20', NULL, 'admin', 'admin', NULL, 1),
+	(3, 'MCNA3', 'MCNA3', 'Nivel de acceso 3 del modulo de comisiones', 1, 1, '2026-10-04 01:17:59', '2026-10-04 01:18:00', NULL, 'admin', 'admin', NULL, 1),
+	(4, 'MGNATSU', 'MGNATSU', 'Nivel de acceso Super Usuario, Modulo Global Nivel de acceso Totao sUPER user', 3, 1, '2026-10-04 15:37:42', NULL, NULL, 'SUsuario', NULL, NULL, 1),
+	(5, 'MANAT', 'MANAT', 'Nvel de acceso total del modulo de Administracion', 4, 1, '2026-10-04 15:40:00', NULL, NULL, 'SUsuario', NULL, NULL, 1);
 
--- Volcando estructura para tabla comisiones.tipo_permiso
+-- Volcando estructura para tabla cati.tipo_permiso
 CREATE TABLE IF NOT EXISTS `tipo_permiso` (
   `Id` int NOT NULL AUTO_INCREMENT,
-  `Clave` int DEFAULT NULL,
+  `Clave` varchar(50) DEFAULT NULL,
   `Nombre` varchar(50) DEFAULT NULL,
-  `Descripcion` varchar(50) DEFAULT NULL,
+  `Descripcion` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   `Activo` tinyint DEFAULT NULL,
   `CreatedAt` datetime DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
@@ -439,22 +479,25 @@ CREATE TABLE IF NOT EXISTS `tipo_permiso` (
   PRIMARY KEY (`Id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Volcando datos para la tabla comisiones.tipo_permiso: ~0 rows (aproximadamente)
+-- Volcando datos para la tabla cati.tipo_permiso: ~4 rows (aproximadamente)
 INSERT INTO `tipo_permiso` (`Id`, `Clave`, `Nombre`, `Descripcion`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
 	(1, NULL, 'R', 'Leer', 1, '2026-10-04 00:39:17', '2026-10-04 00:39:17', NULL, 'admin', 'admin', NULL, '1'),
 	(2, NULL, 'CR', 'Crear y Leer', 1, '2026-10-04 00:43:23', '2026-10-04 00:43:23', NULL, 'admin', 'admin', NULL, '1'),
 	(3, NULL, 'CRU', 'Crear, leer y actualizar', 1, '2026-10-04 00:45:05', '2026-10-04 00:45:05', NULL, 'admin', 'admin', NULL, '1'),
 	(4, NULL, 'CRUD', 'Crear, leer, actualizar y eliminar', 1, '2026-10-04 00:45:29', '2026-10-04 00:45:29', NULL, 'admin', 'admin', NULL, '1');
 
--- Volcando estructura para tabla comisiones.usuario
+-- Volcando estructura para tabla cati.usuario
 CREATE TABLE IF NOT EXISTS `usuario` (
   `Id` int NOT NULL AUTO_INCREMENT,
   `Nombre` varchar(50) DEFAULT NULL,
   `Apellido` varchar(50) DEFAULT NULL,
   `Matricula` varchar(20) DEFAULT NULL,
   `Correo` varchar(50) DEFAULT NULL,
-  `Contrasena` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `Contrasena` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
+  `Rol` varchar(50) DEFAULT NULL,
+  `GradoAcademico` varchar(50) DEFAULT NULL,
   `Genero` tinyint DEFAULT NULL,
+  `IdFacultad` int DEFAULT NULL,
   `Activo` tinyint DEFAULT NULL,
   `CreatedAt` datetime DEFAULT NULL,
   `UpdatedAt` datetime DEFAULT NULL,
@@ -463,20 +506,25 @@ CREATE TABLE IF NOT EXISTS `usuario` (
   `UpdatedBy` varchar(50) DEFAULT NULL,
   `DeletedBy` varchar(50) DEFAULT NULL,
   `Versionn` int DEFAULT NULL,
-  PRIMARY KEY (`Id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci CHECKSUM=1;
+  PRIMARY KEY (`Id`),
+  KEY `FK_usuario_facultad` (`IdFacultad`),
+  CONSTRAINT `FK_usuario_facultad` FOREIGN KEY (`IdFacultad`) REFERENCES `facultad` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci CHECKSUM=1;
 
--- Volcando datos para la tabla comisiones.usuario: ~0 rows (aproximadamente)
-INSERT INTO `usuario` (`Id`, `Nombre`, `Apellido`, `Matricula`, `Correo`, `Contrasena`, `Genero`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
-	(1, 'Juana', 'Guerra', 'JG1997', 'juani@gmail.com', 'blue', 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1),
-	(2, 'Rosa', 'Guerra', 'RG1978', 'Rosy@gmail.com', 'green', 1, 1, '2026-10-03 23:46:57', '2026-10-04 01:11:12', NULL, 'admin', 'admin', NULL, 1),
-	(3, 'Rosario', 'Guerra', 'RG1995', 'Rosarito@gmail.com', 'red', 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1),
-	(4, 'Jose', 'Rejon', 'JR1970', 'jose@gmail.com', 'none', 0, 1, '2026-10-04 01:20:05', '2026-10-04 01:20:05', NULL, 'admin', 'admin', NULL, 1);
+-- Volcando datos para la tabla cati.usuario: ~6 rows (aproximadamente)
+INSERT INTO `usuario` (`Id`, `Nombre`, `Apellido`, `Matricula`, `Correo`, `Contrasena`, `Rol`, `GradoAcademico`, `Genero`, `IdFacultad`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
+	(1, 'Juana', 'Guerra', 'JG1997', 'juani@gmail.com', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Mtra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1),
+	(2, 'Rosa', 'Guerra', 'RG1978', 'Rosy@gmail.com', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Mtra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-04 01:11:12', NULL, 'admin', 'admin', NULL, 1),
+	(3, 'Rosario', 'Guerra', 'RG1995', 'Rosarito@gmail.com', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Dra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1),
+	(4, 'Jose', 'Rejon', 'JR1970', 'jose@gmail.com', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Profesor', 'Dr', 0, 1, 1, '2026-10-04 01:20:05', '2026-10-04 01:20:05', NULL, 'admin', 'admin', NULL, 1),
+	(5, 'SUsuario', NULL, 'SU2003', 'cg7030295@gmail.com', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'SuperUsuario', 'Goat', 0, 3, 1, '2026-10-04 15:28:54', NULL, NULL, 'SUsuario', NULL, NULL, 1),
+	(6, 'Administrador', '1', 'A2003', 'cg7030296@gmail.com', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Administrador', 'Admin', 0, 1, 1, '2026-10-04 15:46:28', NULL, NULL, 'SUsuario', NULL, NULL, 1);
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
 /*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES, 1) */;
+
 
 ```

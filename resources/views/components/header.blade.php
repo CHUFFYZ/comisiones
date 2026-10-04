@@ -10,7 +10,7 @@
         <a href="{{ url('/') }}" class="d-flex align-items-center gap-2 text-white">
             <div class="usu-avatar usu-avatar--prof font-syne">FCI</div>
             <div>
-                <div class="font-syne lh-1 fw-bold fs-6 text-white">SisComisiones</div>
+                <div class="font-syne lh-1 fw-bold fs-6 text-white">CATI</div>
                 <small class="text-white-50" style="font-size: 0.7rem;">FCI · UNACAR</small>
             </div>
         </a>
