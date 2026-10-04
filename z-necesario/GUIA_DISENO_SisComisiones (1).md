@@ -319,57 +319,12 @@ Usar utilidades: `fs-6`, `small`, `fw-semibold`, `text-uppercase`, `text-seconda
 
 ## 13. `estructura de carpetas` - carpetas
 ```css
-estructura carpetas;:
-
-UniversidadApp/
-├── app/
-│   ├── Http/
-│   │   ├── Controllers/
-│   │   │   ├── Admin/
-│   │   │   │   └── PermisoController.php
-│   │   │   ├── Auth/
-│   │   │   │   └── LoginController.php
-│   │   │   ├── Comisiones/
-│   │   │   │   ├── ProfesorComisionController.php
-│   │   │   │   └── SecretariaComisionController.php
-│   │   │   └── Publico/
-│   │   │       └── NoticiaController.php
-│   │   └── Middleware/
-│   │       └── VerificarModulo.php
-│   └── Models/
-│       ├── AsignacionPermiso.php               <-- Mapea asignacion_permiso
-│       ├── Comision.php                        <-- Mapea la tabla de comisiones
-│       ├── Modulo.php                          <-- Mapea modulo
-│       ├── NivelAcceso.php                     <-- Mapea nivel_acceso
-│       ├── Noticia.php                         <-- Mapea noticias
-│       ├── TipoPermiso.php                     <-- Mapea tipo_permiso
-│       └── Usuario.php                         <-- Mapea usuario
-├── resources/
-│   └── views/
-│       ├── admin/
-│       │   └── permisos.blade.php
-│       ├── auth/
-│       │   └── login.blade.php
-│       ├── comisiones/
-│       │   ├── profesor/
-│       │   │   └── index.blade.php
-│       │   └── secretaria/
-│       │       ├── crear.blade.php
-│       │       └── index.blade.php
-│       ├── layouts/
-│       │   └── app.blade.php
-│       └── publico/
-│           └── inicio.blade.php
-├── routes/
-│   └── web.php
-└── .env
-
 ```
 
 ## 14. `base de datos hata el momento` - asdadsaddsadadasb
 ```css
 
-db hasta el momento: -- --------------------------------------------------------
+-- --------------------------------------------------------
 -- Host:                         127.0.0.1
 -- Versión del servidor:         8.4.3 - MySQL Community Server - GPL
 -- SO del servidor:              Win64
@@ -523,4 +478,5 @@ INSERT INTO `usuario` (`Id`, `Nombre`, `Apellido`, `Matricula`, `Correo`, `Contr
 /*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES, 1) */;
+
 ```
