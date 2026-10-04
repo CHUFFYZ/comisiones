@@ -22,6 +22,8 @@
     --degradado-exito: linear-gradient(135deg, var(--verde-oscuro), var(--verde));
     --sombra-marca: 0 6px 20px rgba(255, 126, 95, .40);
     --card-sombra: 0 4px 20px rgba(0, 0, 0, .08);
+    --fondo: rgb(255, 255, 255);
+    --fondo-oscuro: #f8f9fa;
 
     /* ── Variables de Bootstrap sobrescritas ── */
     --bs-body-font-family: 'DM Sans', sans-serif;
@@ -46,10 +48,10 @@
     --bs-link-color: var(--naranja);
     --bs-link-hover-color: #e8664a;
 }
-
 body {
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
+    background-color: var(--fondo);
 }
 
 h1, h2, h3, h4, h5, h6, .font-syne {
@@ -162,7 +164,7 @@ a {
 .sidebar-wrapper {
     width: 260px;
     min-height: calc(100vh - 60px);
-    background: #fff;
+    background: var(--fondo-oscuro) !important;
     border-right: 1.5px solid var(--bs-border-color);
 }
 
