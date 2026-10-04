@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'SisComisiones · FCI UNACAR')</title>
+    <title>@yield('title', 'CATI · FCI UNACAR')</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,11 +29,11 @@
     @include('components.header')
 
     <!-- Layout Contenido Principal -->
-    <div class="d-flex flex-grow-1">
-        <!-- Sidebar Navigation -->
-        @include('components.sidebar')
+     <div class="d-flex flex-grow-1">
+        @auth
+            @include('components.sidebar')
+        @endauth
 
-        <!-- Main Content Area -->
         <main class="flex-grow-1 p-3 p-md-4 d-flex flex-column">
             @yield('content')
         </main>

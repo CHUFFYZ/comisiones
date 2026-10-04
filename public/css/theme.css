@@ -62,7 +62,8 @@ h1, h2, h3, h4, h5, h6, .font-syne {
 a {
     text-decoration: none;
 }
-
+.app-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 50%; }
+.dropdown-menu { border-radius: 12px; font-family: 'DM Sans', sans-serif; }
 /* ── Botones ── */
 .btn {
     --bs-btn-border-radius: 50rem;

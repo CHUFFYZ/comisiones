@@ -12,32 +12,28 @@
 
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item mb-1">
-                <a href="{{ route('inicio') }}" class="nav-link {{ request()->routeIs('inicio') ? 'active' : '' }}">
-                    <i class="fa-solid fa-house w-20px"></i>
-                    <span>Inicio / Noticias</span>
+                <a href="{{ route('modulos.index') }}" class="nav-link {{ request()->routeIs('modulos.index') ? 'active' : '' }}">
+                    <i class="fa-solid fa-table-cells-large w-20px"></i>
+                    <span>Mis módulos</span>
                 </a>
             </li>
 
-            <li class="nav-item mb-1">
-                <a href="{{ route('admin.permisos.index') }}" class="nav-link {{ request()->routeIs('admin.permisos.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-user-shield w-20px"></i>
-                    <span>Administrar Permisos</span>
-                </a>
-            </li>
-            
-            <li class="nav-item mb-1">
-                <a href="#" class="nav-link text-body-tertiary pe-none opacity-50">
-                    <i class="fa-solid fa-file-contract w-20px"></i>
-                    <span>Comisiones (Próximamente)</span>
-                </a>
-            </li>
+            @foreach ($modulosMenu as $m)
+                <li class="nav-item mb-1">
+                    <a href="{{ route('modulos.show', $m->Clave) }}"
+                       class="nav-link {{ request()->routeIs('modulos.show') && ($moduloActual->Clave ?? null) === $m->Clave ? 'active' : '' }}">
+                        <i class="fa-solid {{ config('modulos.iconos.' . $m->Clave, config('modulos.icono_default')) }} w-20px"></i>
+                        <span>{{ $m->Nombre }}</span>
+                    </a>
+                </li>
+            @endforeach
         </ul>
 
         <hr class="my-3 opacity-10">
 
         <div class="px-3 py-2 bg-light rounded-3 text-center">
-            <small class="text-muted d-block font-monospace" style="font-size: 0.7rem;">SisComisiones v1.0</small>
-            <small class="text-muted d-block" style="font-size: 0.65rem;">FCI · UNACAR 2026</small>
+            <small class="text-muted d-block font-monospace text-xs">CATI v1.0</small>
+            <small class="text-muted d-block text-xs">{{ $facultadActual->Clave ?? 'FCI' }} · UNACAR 2026</small>
         </div>
     </div>
 </div>
