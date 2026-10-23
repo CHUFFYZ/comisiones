@@ -392,12 +392,14 @@ CREATE TABLE IF NOT EXISTS `comision` (
   `IdTipoComision` int NOT NULL,
   `IdPlantilla` int NOT NULL,
   `IdEstado` int NOT NULL,
+  `IdFacultad` int NOT NULL,
   `NOficio` varchar(50) NOT NULL,
   `Asunto` varchar(255) NOT NULL,
   `FechaEmision` datetime NOT NULL,
   `FechaInicio` date NOT NULL,
   `FechaFin` date DEFAULT NULL,
   `DirectorNombre` varchar(150) NOT NULL,
+  `DirectorCargo` varchar(50) DEFAULT NULL,
   `DirectorFirmaUrl` varchar(500) DEFAULT NULL,
   `DirectorSelloUrl` varchar(500) DEFAULT NULL,
   `FirmaElaboracion` varchar(100) NOT NULL,
@@ -413,12 +415,18 @@ CREATE TABLE IF NOT EXISTS `comision` (
   KEY `FK_comision_tipo` (`IdTipoComision`),
   KEY `FK_comision_plantilla` (`IdPlantilla`),
   KEY `FK_comision_estado` (`IdEstado`),
+  KEY `FK_comision_facultad` (`IdFacultad`),
   CONSTRAINT `FK_comision_estado` FOREIGN KEY (`IdEstado`) REFERENCES `estado_comision` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `FK_comision_facultad` FOREIGN KEY (`IdFacultad`) REFERENCES `facultad` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `FK_comision_plantilla` FOREIGN KEY (`IdPlantilla`) REFERENCES `plantilla_documento` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `FK_comision_tipo` FOREIGN KEY (`IdTipoComision`) REFERENCES `tipo_comision` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Volcando datos para la tabla cati.comision: ~0 rows (aproximadamente)
+-- Volcando datos para la tabla cati.comision: ~3 rows (aproximadamente)
+INSERT INTO `comision` (`Id`, `IdTipoComision`, `IdPlantilla`, `IdEstado`, `IdFacultad`, `NOficio`, `Asunto`, `FechaEmision`, `FechaInicio`, `FechaFin`, `DirectorNombre`, `DirectorCargo`, `DirectorFirmaUrl`, `DirectorSelloUrl`, `FirmaElaboracion`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
+	(1, 3, 1, 3, 1, 'FCI-COMISION-2026-OCT-001', 'Comision', '2026-10-22 21:01:46', '2026-10-02', '2026-10-15', 'Dr. Jose Alonzo Perez Cruz', 'Director', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsBB58qlamAk5eHoP7AZEUZuu3JGvVloILo1JNTnNUYQ&s=10', 'https://i.pinimg.com/736x/3b/e0/91/3be0912b73bd1a67cf18cc841137b315.jpg', 'C.c.p. Archivo FCI/jg', 1, '2026-10-22 21:01:46', '2026-10-22 21:34:15', NULL, 'JG1997', 'SU2003', NULL, 1),
+	(2, 1, 1, 3, 1, 'FCI-COMISION-2026-OCT-002', 'Comision', '2026-10-22 21:12:44', '2026-10-02', '2026-10-15', 'Dr. Jose Alonzo Perez Cruz', 'Director', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsBB58qlamAk5eHoP7AZEUZuu3JGvVloILo1JNTnNUYQ&s=10', 'https://i.pinimg.com/736x/3b/e0/91/3be0912b73bd1a67cf18cc841137b315.jpg', 'C.c.p. Archivo FCI/jg', 1, '2026-10-22 21:12:44', '2026-10-23 13:25:29', NULL, 'JG1997', 'SU2003', NULL, 1),
+	(3, 3, 1, 1, 1, 'FCI-COMISION-2026-OCT-003', 'lol', '2026-10-22 21:47:22', '2026-10-09', '2026-10-31', 'Dr. Jose Alonzo Perez Cruz', 'Director', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsBB58qlamAk5eHoP7AZEUZuu3JGvVloILo1JNTnNUYQ&s=10', 'https://i.pinimg.com/736x/3b/e0/91/3be0912b73bd1a67cf18cc841137b315.jpg', 'C.c.p. Archivo FCI/ceghr', 1, '2026-10-22 21:47:22', '2026-10-23 13:44:07', NULL, 'JG1997', 'SU2003', NULL, 1);
 
 -- Volcando estructura para tabla cati.comision_profesor
 CREATE TABLE IF NOT EXISTS `comision_profesor` (
@@ -431,6 +439,12 @@ CREATE TABLE IF NOT EXISTS `comision_profesor` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Volcando datos para la tabla cati.comision_profesor: ~0 rows (aproximadamente)
+INSERT INTO `comision_profesor` (`IdComision`, `IdUsuario`) VALUES
+	(2, 4),
+	(3, 4),
+	(1, 7),
+	(2, 7),
+	(3, 7);
 
 -- Volcando estructura para tabla cati.constancia
 CREATE TABLE IF NOT EXISTS `constancia` (
@@ -439,6 +453,7 @@ CREATE TABLE IF NOT EXISTS `constancia` (
   `IdPlantilla` int NOT NULL,
   `FechaElaboracion` datetime NOT NULL,
   `DirectorNombre` varchar(150) NOT NULL,
+  `DirectorCargo` varchar(50) DEFAULT NULL,
   `DirectorFirmaUrl` varchar(500) DEFAULT NULL,
   `DirectorSelloUrl` varchar(500) DEFAULT NULL,
   `FirmaElaboracion` varchar(100) NOT NULL,
@@ -455,9 +470,11 @@ CREATE TABLE IF NOT EXISTS `constancia` (
   KEY `FK_constancia_plantilla` (`IdPlantilla`),
   CONSTRAINT `FK_constancia_comision` FOREIGN KEY (`IdComision`) REFERENCES `comision` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `FK_constancia_plantilla` FOREIGN KEY (`IdPlantilla`) REFERENCES `plantilla_documento` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Volcando datos para la tabla cati.constancia: ~0 rows (aproximadamente)
+-- Volcando datos para la tabla cati.constancia: ~1 rows (aproximadamente)
+INSERT INTO `constancia` (`Id`, `IdComision`, `IdPlantilla`, `FechaElaboracion`, `DirectorNombre`, `DirectorCargo`, `DirectorFirmaUrl`, `DirectorSelloUrl`, `FirmaElaboracion`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
+	(1, 1, 2, '2026-10-22 21:34:17', 'Dr. Jose Alonzo Perez Cruz', 'Director', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsBB58qlamAk5eHoP7AZEUZuu3JGvVloILo1JNTnNUYQ&s=10', 'https://i.pinimg.com/736x/3b/e0/91/3be0912b73bd1a67cf18cc841137b315.jpg', 'C.c.p. Archivo FGPSU/s', 1, '2026-10-22 21:34:17', NULL, NULL, 'SU2003', NULL, NULL, 1);
 
 -- Volcando estructura para tabla cati.estado_comision
 CREATE TABLE IF NOT EXISTS `estado_comision` (
@@ -471,7 +488,7 @@ CREATE TABLE IF NOT EXISTS `estado_comision` (
 
 -- Volcando datos para la tabla cati.estado_comision: ~3 rows (aproximadamente)
 INSERT INTO `estado_comision` (`Id`, `Nombre`, `Activo`, `CreatedAt`, `CreatedBy`) VALUES
-	(1, 'Iniciado', 1, '2026-10-22 19:26:26', 'admin'),
+	(1, 'Sin iniciar', 1, '2026-10-22 19:26:26', 'admin'),
 	(2, 'En Proceso', 1, '2026-10-22 19:26:26', 'admin'),
 	(3, 'Finalizado', 1, '2026-10-22 19:26:26', 'admin');
 
@@ -577,8 +594,8 @@ CREATE TABLE IF NOT EXISTS `plantilla_documento` (
 
 -- Volcando datos para la tabla cati.plantilla_documento: ~2 rows (aproximadamente)
 INSERT INTO `plantilla_documento` (`Id`, `TipoDocumento`, `NombreUniversidad`, `Facultad`, `Lugar`, `LogoIzquierdo`, `LogoDerecho`, `Introduccion`, `Contexto`, `Cierre`, `Despedida`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
-	(1, 'Comision', 'UNIVERSIDAD AUTÓNOMA DEL CARMEN', 'FACULTAD DE CIENCIAS DE LA INFORMACIÓN', 'Ciudad del Carmen, Campeche', NULL, NULL, 'Por medio de la presente se le informa que ha sido comisionado para ', NULL, ', con el propósito de fortalecer las competencias de los estudiantes próximos a egresar y contribuir a la mejora de los indicadores académicos de nuestra Facultad. Esta actividad se llevará a cabo del 20 al 25 de noviembre del presente.', 'Agradecemos de antemano su colaboración y compromiso. Sin otro particular, reciba un cordial saludo.', 1, '2026-10-22 19:31:48', NULL, NULL, 'admin', NULL, NULL, 1),
-	(2, 'Constancia', 'UNIVERSIDAD AUTÓNOMA DEL CARMEN', 'FACULTAD DE CIENCIAS DE LA INFORMACIÓN', 'Ciudad del Carmen, Campeche', NULL, NULL, 'Por medio de la presente, se hace constar que atendió satisfactoriamente la comisión asignada por la Facultad, la cual consistió en ', NULL, '. Esta actividad se enmarca en el plan de desarrollo de la Facultad.', 'Sin otro particular, me despido enviándoles un cordial saludo.', 1, '2026-10-22 19:33:17', NULL, NULL, 'admin', NULL, NULL, 1);
+	(1, 'Comision', 'UNIVERSIDAD AUTÓNOMA DEL CARMEN', 'FACULTAD DE CIENCIAS DE LA INFORMACIÓN', 'Ciudad del Carmen, Campeche', 'https://www.unacar.mx/unacar/imagenes/escudo_unacar.png', 'https://www.unacar.mx/unacar/Documentos/logotipo22-26/EDUCANDO-VF-SLOGAN-(IDENTIDAD)-NEGRO.png', 'Por medio de la presente se le informa que ha sido comisionado para ', NULL, ', con el propósito de fortalecer las competencias de los estudiantes próximos a egresar y contribuir a la mejora de los indicadores académicos de nuestra Facultad. Esta actividad se llevará a cabo {fechas}.', 'Agradecemos de antemano su colaboración y compromiso. Sin otro particular, reciba un cordial saludo.', 1, '2026-10-22 19:31:48', '2026-10-22 21:03:19', NULL, 'admin', NULL, NULL, 1),
+	(2, 'Constancia', 'UNIVERSIDAD AUTÓNOMA DEL CARMEN', 'FACULTAD DE CIENCIAS DE LA INFORMACIÓN', 'Ciudad del Carmen, Campeche', 'https://www.unacar.mx/unacar/imagenes/escudo_unacar.png', 'https://www.unacar.mx/unacar/Documentos/logotipo22-26/EDUCANDO-VF-SLOGAN-(IDENTIDAD)-NEGRO.png', 'Por medio de la presente, se hace constar que atendió satisfactoriamente la comisión asignada por la Facultad, la cual consistió en ', NULL, '. Esta actividad se enmarca en el plan de desarrollo de la Facultad.', 'Sin otro particular, me despido enviándoles un cordial saludo.', 1, '2026-10-22 19:33:17', '2026-10-22 21:03:20', NULL, 'admin', NULL, NULL, 1);
 
 -- Volcando estructura para tabla cati.tipo_comision
 CREATE TABLE IF NOT EXISTS `tipo_comision` (
@@ -647,21 +664,23 @@ CREATE TABLE IF NOT EXISTS `usuario` (
   `UpdatedBy` varchar(50) DEFAULT NULL,
   `DeletedBy` varchar(50) DEFAULT NULL,
   `Versionn` int DEFAULT NULL,
+  `FirmaUrl` varchar(500) DEFAULT NULL,
+  `SelloUrl` varchar(500) DEFAULT NULL,
   PRIMARY KEY (`Id`),
   KEY `FK_usuario_facultad` (`IdFacultad`),
   CONSTRAINT `FK_usuario_facultad` FOREIGN KEY (`IdFacultad`) REFERENCES `facultad` (`Id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci CHECKSUM=1;
 
 -- Volcando datos para la tabla cati.usuario: ~6 rows (aproximadamente)
-INSERT INTO `usuario` (`Id`, `Nombre`, `Apellido`, `Matricula`, `Correo`, `Iniciales`, `Contrasena`, `Rol`, `GradoAcademico`, `Genero`, `IdFacultad`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`) VALUES
-	(1, 'Juana', 'Guerra', 'JG1997', 'juani@gmail.com', 'jg', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Mtra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1),
-	(2, 'Rosa', 'Guerra', 'RG1978', 'Rosy@gmail.com', 'rg', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Mtra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-04 01:11:12', NULL, 'admin', 'admin', NULL, 1),
-	(3, 'Rosario', 'Guerra', 'RG1995', 'Rosarito@gmail.com', 'rg', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'SecretariaAcademica', 'Dra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1),
-	(4, 'Jose', 'Rejon', 'JR1970', 'jose@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Profesor', 'Dr', 0, 1, 1, '2026-10-04 01:20:05', '2026-10-04 01:20:05', NULL, 'admin', 'admin', NULL, 1),
-	(5, 'SUsuario', NULL, 'SU2003', 'cg7030295@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'SuperUsuario', 'Goat', 0, 3, 1, '2026-10-04 15:28:54', NULL, NULL, 'SUsuario', NULL, NULL, 1),
-	(6, 'Administrador', '1', 'A2003', 'cg7030296@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Administrador', 'Admin', 0, 1, 1, '2026-10-04 15:46:28', NULL, NULL, 'SUsuario', NULL, NULL, 1),
-	(7, 'Guerra', 'Guerrero', 'GG1234', 'gg@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Profesor', 'Dr', 0, 1, 1, '2026-10-22 18:21:58', '2026-10-22 18:21:59', NULL, 'admin', NULL, NULL, 1),
-	(8, 'Jose Alonzo', 'Perez Cruz', 'JAPC2025', 'jperez@unacar.mx', 'japc', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Director', 'Dr', 0, 1, 1, '2026-10-22 19:26:26', NULL, NULL, 'admin', NULL, NULL, 1);
+INSERT INTO `usuario` (`Id`, `Nombre`, `Apellido`, `Matricula`, `Correo`, `Iniciales`, `Contrasena`, `Rol`, `GradoAcademico`, `Genero`, `IdFacultad`, `Activo`, `CreatedAt`, `UpdatedAt`, `DeletedAt`, `CreatedBy`, `UpdatedBy`, `DeletedBy`, `Versionn`, `FirmaUrl`, `SelloUrl`) VALUES
+	(1, 'Chuina Estrellita Guadalupe', 'Hernandez Rosado', 'JG1997', 'juani@gmail.com', 'ceghr', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Mtra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1, NULL, NULL),
+	(2, 'Nelly Isabel', 'Angel Hernandez', 'RG1978', 'Rosy@gmail.com', 'niah', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Secretaria', 'Mtra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-04 01:11:12', NULL, 'admin', 'admin', NULL, 1, NULL, NULL),
+	(3, 'Saide Dariola', 'Duran Martin', 'RG1995', 'Rosarito@gmail.com', 'sddm', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'SecretariaAcademica', 'Dra', 1, 1, 1, '2026-10-03 23:46:57', '2026-10-03 23:46:57', NULL, 'admin', 'admin', NULL, 1, NULL, NULL),
+	(4, 'Jose Angel', 'Perez Rejon', 'JR1970', 'jose@gmail.com', 'japr', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Profesor', 'Dr', 0, 1, 1, '2026-10-04 01:20:05', '2026-10-04 01:20:05', NULL, 'admin', 'admin', NULL, 1, NULL, NULL),
+	(5, 'SUsuario', NULL, 'SU2003', 'cg7030295@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'SuperUsuario', 'Goat', 0, 3, 1, '2026-10-04 15:28:54', NULL, NULL, 'SUsuario', NULL, NULL, 1, NULL, NULL),
+	(6, 'Administrador', '1', 'A2003', 'cg7030296@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Administrador', 'Admin', 0, 1, 1, '2026-10-04 15:46:28', NULL, NULL, 'SUsuario', NULL, NULL, 1, NULL, NULL),
+	(7, 'Guerra', 'Guerrero', 'GG1234', 'gg@gmail.com', NULL, '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Profesor', 'Dr', 0, 1, 1, '2026-10-22 18:21:58', '2026-10-22 18:21:59', NULL, 'admin', NULL, NULL, 1, NULL, NULL),
+	(8, 'Jose Alonzo', 'Perez Cruz', 'JAPC2025', 'jperez@unacar.mx', 'japc', '$2y$10$YOLl8FTfQVJEGwF8YMAQuuAOSfMi2ysQtn6Y.V6NAjayPGhKkKDza', 'Director', 'Dr', 0, 1, 1, '2026-10-22 19:26:26', NULL, NULL, 'admin', NULL, NULL, 1, 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsBB58qlamAk5eHoP7AZEUZuu3JGvVloILo1JNTnNUYQ&s=10', 'https://i.pinimg.com/736x/3b/e0/91/3be0912b73bd1a67cf18cc841137b315.jpg');
 
 -- Volcando estructura para tabla cati.usuario_tipo_comision
 CREATE TABLE IF NOT EXISTS `usuario_tipo_comision` (
