@@ -64,6 +64,14 @@ a {
 }
 .app-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 50%; }
 .dropdown-menu { border-radius: 12px; font-family: 'DM Sans', sans-serif; }
+
+.menu-usuario { min-width: 250px; }
+.chevron-collapse { transition: transform .2s; }
+[aria-expanded="true"] > .chevron-collapse { transform: rotate(180deg); }
+
+
+/* Si hay muchos módulos, la lista tiene su propio scroll y no empuja el menú del módulo */
+.submenu-modulos { max-height: 220px; overflow-y: auto; }
 /* ── Botones ── */
 .btn {
     --bs-btn-border-radius: 50rem;
@@ -164,7 +172,7 @@ a {
 /* ── Navegación Lateral (Sidebar) ── */
 .sidebar-wrapper {
     width: 260px;
-    min-height: calc(100vh - 60px);
+    min-height: calc(100vh - 114px);
     background: var(--fondo-oscuro) !important;
     border-right: 1.5px solid var(--bs-border-color);
 }
@@ -206,7 +214,7 @@ main     { min-width: 0; }
 
 /* Sidebar fijo en desktop */
 @media (min-width: 992px) {
-    .sidebar-wrapper { position: sticky; top: 60px; height: calc(100svh - 60px); overflow-y: auto; }
+    .sidebar-wrapper { position: sticky; top: 60px; height: calc(100svh - 114px); overflow-y: auto; }
 }
 
 /* Cards */

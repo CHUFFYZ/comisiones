@@ -21,10 +21,12 @@ class ModuloController extends Controller
     public function show(Request $request)
     {
         $modulo = $request->attributes->get('modulo');
+        $user   = $request->user();
 
         return view('modulos.show', [
-            'modulo'  => $modulo,
-            'permiso' => $this->acceso->letrasEn($request->user(), $modulo->Clave),
+            'modulo'   => $modulo,
+            'permiso'  => $this->acceso->letrasEn($user, $modulo->Clave),
+            'opciones' => $this->acceso->opcionesDe($user, $modulo->Clave),
         ]);
     }
 }

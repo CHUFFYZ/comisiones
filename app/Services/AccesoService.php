@@ -5,10 +5,11 @@ namespace App\Services;
 use App\Models\Modulo;
 use App\Models\Usuario;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
 
 class AccesoService
 {
-    /** Clave de asignación_permiso que da acceso total a todos los módulos. */
+    /** Clave de asignacion_permiso que da acceso total a todos los módulos. */
     public const CLAVE_SUPERUSUARIO = 'APTSU';
 
     private const LETRAS = [
@@ -16,21 +17,27 @@ class AccesoService
     ];
 
     private array $cache = [];
+    private array $idsModulo = [];
 
+    /** Superusuario: clave APTSU o un nivel de acceso del módulo Global. */
     public function esSuperUsuario(?Usuario $u): bool
     {
-        return $u && $this->asignaciones($u)
-            ->contains(fn ($a) => $a->Clave === self::CLAVE_SUPERUSUARIO);
+        return $u && $this->asignaciones($u)->contains(
+            fn ($a) => $a->Clave === self::CLAVE_SUPERUSUARIO
+                || $a->nivel?->modulo?->Clave === config('modulos.modulo_global')
+        );
     }
 
-    /** Módulos activos a los que el usuario tiene acceso. */
+    /** Módulos reales (sin Global ni Principal) a los que el usuario tiene acceso. */
     public function modulosDe(?Usuario $u): Collection
     {
         if (!$u) {
             return collect();
         }
 
-        $q = Modulo::where('Activo', 1)->orderBy('Id');
+        $q = Modulo::where('Activo', 1)
+            ->whereNotIn('Clave', config('modulos.ocultos', []))
+            ->orderBy('Id');
 
         if (!$this->esSuperUsuario($u)) {
             $q->whereIn('Id', $this->efectivos($u)->pluck('modulo')->unique()->all());
@@ -49,7 +56,7 @@ class AccesoService
             return 'CRUD';
         }
 
-        $idModulo = Modulo::where('Clave', $claveModulo)->value('Id');
+        $idModulo = $this->idModulo($claveModulo);
         if (!$idModulo) {
             return '';
         }
@@ -65,12 +72,32 @@ class AccesoService
         return str_contains($this->letrasEn($u, $claveModulo), self::LETRAS[$accion] ?? '?');
     }
 
+    /**
+     * Opciones del módulo que el usuario puede ver según su permiso.
+     * Cada item incluye 'url' (null si la ruta aún no existe).
+     */
+    public function opcionesDe(?Usuario $u, string $claveModulo): Collection
+    {
+        return collect(config("modulos.opciones.$claveModulo", []))
+            ->filter(fn ($o) => $this->puede($u, $claveModulo, $o['accion'] ?? 'leer'))
+            ->map(function ($o) {
+                $o['url'] = (isset($o['ruta']) && Route::has($o['ruta'])) ? route($o['ruta']) : null;
+                return $o;
+            })
+            ->values();
+    }
+
     /* ───────── internos ───────── */
+
+    private function idModulo(string $clave): ?int
+    {
+        return $this->idModulo[$clave] ??= Modulo::where('Clave', $clave)->value('Id');
+    }
 
     private function asignaciones(Usuario $u): Collection
     {
         return $this->cache[$u->Id] ??= $u->asignaciones()
-            ->with(['nivel', 'tipo', 'nivelTemp', 'tipoTemp'])
+            ->with(['nivel.modulo', 'tipo', 'nivelTemp', 'tipoTemp'])
             ->get();
     }
 
