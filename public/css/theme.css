@@ -242,3 +242,24 @@ main     { min-width: 0; }
 .toast { border: 0; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.2); font-size: .82rem; font-weight: 500; }
 .toast.text-bg-success { background: var(--verde-oscuro) !important; }
 .toast.text-bg-danger  { background: var(--rojo) !important; }
+
+/* Badges de estado */
+.badge-estado { display:inline-flex; align-items:center; gap:5px; font-weight:500; font-size:.69rem; }
+.badge-estado::before { content:''; width:7px; height:7px; border-radius:50%; background:currentColor; }
+.estado-no-iniciado { background:rgba(232,74,95,.1);  color:var(--rojo); }
+.estado-proceso     { background:rgba(249,168,37,.1); color:var(--amarillo-osc); }
+.estado-terminado   { background:rgba(46,204,113,.1); color:var(--verde-oscuro); }
+
+/* Botones ghost */
+.btn-ghost { --bs-btn-color:#555; --bs-btn-bg:#fff; --bs-btn-border-color:var(--bs-border-color);
+             --bs-btn-hover-color:#555; --bs-btn-hover-bg:var(--superficie-3); --bs-btn-hover-border-color:var(--bs-border-color); }
+.btn-ghost.is-danger:hover  { background:rgba(232,74,95,.08);  color:var(--rojo);          border-color:rgba(232,74,95,.2); }
+.btn-ghost.is-success:hover { background:rgba(46,204,113,.10); color:var(--verde-oscuro);  border-color:rgba(46,204,113,.3); }
+.btn-ghost.is-brand { background-image:var(--degradado-marca); color:#fff; border-color:transparent; }
+
+/* Tablas, alertas, listas */
+.table { --bs-table-bg:#fff; --bs-table-hover-bg:#fdf8f4; }
+.table thead th { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--gris); white-space:nowrap; background:#fff; }
+.table td { font-size:.82rem; vertical-align:middle; }
+.alert-danger { background:rgba(232,74,95,.1); border-color:rgba(232,74,95,.25); color:var(--rojo); border-radius:10px; font-size:.82rem; }
+.lista-scroll { max-height:240px; overflow-y:auto; }

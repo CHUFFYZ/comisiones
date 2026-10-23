@@ -68,6 +68,10 @@
             toast.show();
         }
     </script>
+    <script>
+        @if (session('ok')) showToast(@json(session('ok')), 'success'); @endif
+        @if ($errors->has('general')) showToast(@json($errors->first('general')), 'error'); @endif
+    </script>
 
     @stack('scripts')
 </body>

@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ModuloController;
+use App\Http\Controllers\ComisionController;
+use App\Http\Controllers\ConstanciaController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('publico.inicio'))->name('inicio');
@@ -19,10 +21,21 @@ Route::middleware('auth')->group(function () {
         ->middleware('modulo.acceso:leer')
         ->name('modulos.show');
 
-    // Ejemplo para cuando construyas un módulo real (el permiso se valida solo):
-    // Route::prefix('modulos/MSC/comisiones')->name('comisiones.')->group(function () {
-    //     Route::get('/',        [ComisionController::class, 'index'])->middleware('modulo.acceso:leer,MSC');
-    //     Route::post('/',       [ComisionController::class, 'store'])->middleware('modulo.acceso:crear,MSC');
-    //     Route::delete('/{id}', [ComisionController::class, 'destroy'])->middleware('modulo.acceso:eliminar,MSC');
-    // });
+   Route::prefix('modulos/MSC')->group(function () {
+    Route::prefix('comisiones')->name('comisiones.')->group(function () {
+        Route::get('/',                [ComisionController::class, 'index'])->middleware('modulo.acceso:leer,MSC')->name('index');
+        Route::get('/crear',           [ComisionController::class, 'create'])->middleware('modulo.acceso:crear,MSC')->name('create');
+        Route::post('/',               [ComisionController::class, 'store'])->middleware('modulo.acceso:crear,MSC')->name('store');
+        Route::get('/anuladas',        [ComisionController::class, 'anuladas'])->middleware('modulo.acceso:eliminar,MSC')->name('anuladas');
+        Route::get('/{id}/pdf',        [ComisionController::class, 'pdf'])->whereNumber('id')->middleware('modulo.acceso:leer,MSC')->name('pdf');
+        Route::patch('/{id}/estado',   [ComisionController::class, 'estado'])->whereNumber('id')->middleware('modulo.acceso:actualizar,MSC')->name('estado');
+        Route::delete('/{id}',         [ComisionController::class, 'anular'])->whereNumber('id')->middleware('modulo.acceso:eliminar,MSC')->name('anular');
+    });
+
+    Route::prefix('constancias')->name('constancias.')->group(function () {
+        Route::get('/',            [ConstanciaController::class, 'index'])->middleware('modulo.acceso:actualizar,MSC')->name('index');
+        Route::post('/{id}',       [ConstanciaController::class, 'store'])->whereNumber('id')->middleware('modulo.acceso:actualizar,MSC')->name('store');
+        Route::get('/{id}/pdf',    [ConstanciaController::class, 'pdf'])->whereNumber('id')->middleware('modulo.acceso:leer,MSC')->name('pdf');
+    });
+});
 });

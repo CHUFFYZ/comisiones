@@ -31,4 +31,8 @@ class Usuario extends Authenticatable
     {
         return trim($this->Nombre . ' ' . $this->Apellido);
     }
+    public function tiposComision()
+    {
+        return $this->belongsToMany(TipoComision::class, 'usuario_tipo_comision', 'IdUsuario', 'IdTipoComision');
+    }
 }
