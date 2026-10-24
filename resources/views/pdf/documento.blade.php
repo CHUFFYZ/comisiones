@@ -1,3 +1,7 @@
+@php
+    $rotacionAleatoriaSello = rand(-45, 45); 
+    $rotacionAleatoriaFirma = rand(-10, 10); 
+@endphp
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -18,7 +22,7 @@
     .firma-box { height: 60px; }
     .firma-box img { height: 60px; }
     .linea { border-top: 1px solid #000; width: 230px; margin-bottom: 4px; }
-    .sello img { height: 95px; }
+    .sello img { height: 120px; }
     .footer { position: fixed; bottom: -70px; left: 0; right: 0; }
     .ccp { font-size: 9px; margin-bottom: 6px; }
     .addr { border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 9px; }
@@ -71,12 +75,12 @@
             <td style="width:60%; vertical-align:bottom;">
                 <div><strong>Atentamente,</strong></div>
                 <div><strong><em>Por la Grandeza de México</em></strong></div>
-                <div class="firma-box">@if ($firma)<img src="{{ $firma }}">@endif</div>
+                <div class="firma-box" style="rotate: {{ $rotacionAleatoriaFirma }}deg; transform-origin: left;">@if ($firma)<img src="{{ $firma }}">@endif</div>
                 <div class="linea"></div>
                 <div><strong>{{ $doc->DirectorNombre }}</strong></div>
                 <div><strong>{{ $doc->DirectorCargo ?: 'Director' }} de la {{ $facTitulo }}</strong></div>
             </td>
-            <td class="sello" style="vertical-align:bottom; text-align:center;">
+            <td class="sello" style="vertical-align:bottom; text-align:center; rotate: {{ $rotacionAleatoriaSello }}deg; transform-origin: center;">
                 @if ($sello)<img src="{{ $sello }}">@endif
             </td>
         </tr>
