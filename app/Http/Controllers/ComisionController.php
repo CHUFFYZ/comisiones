@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Comision;
 use App\Models\EstadoComision;
 use App\Models\PlantillaDocumento;
+use App\Models\Usuario;
 use App\Services\ComisionService;
+use App\Services\DocumentoService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ComisionController extends Controller
 {
-    public function __construct(private ComisionService $svc) {}
+    public function __construct(private ComisionService $svc, private DocumentoService $docs) {}
 
     public function index(Request $r)    { return $this->listar($r, false); }
     public function anuladas(Request $r) { return $this->listar($r, true); }
@@ -33,11 +36,32 @@ class ComisionController extends Controller
         ]);
     }
 
+    /** Detalle completo de la comisión (sin necesidad de abrir el PDF). */
+    public function show(Request $r, int $id)
+    {
+        $c = $this->buscar($r, $id)->load(['facultad', 'logs.usuario', 'reporteUsuario']);
+
+        return view('comisiones.show', ['c' => $c]);
+    }
+
     public function create(Request $r)
+    {
+        return $this->formulario($r, null);
+    }
+
+    public function edit(Request $r, int $id)
+    {
+        $c = $this->buscar($r, $id, false);
+
+        return $this->formulario($r, $c);
+    }
+
+    private function formulario(Request $r, ?Comision $c)
     {
         $u = $r->user();
 
-        return view('comisiones.create', [
+        return view('comisiones.form', [
+            'comision'   => $c,
             'tipos'      => $this->svc->tiposPermitidos($u),
             'plantillas' => PlantillaDocumento::where('TipoDocumento', 'Comision')->where('Activo', 1)->get(),
             'profesores' => $this->svc->profesores($u),
@@ -46,52 +70,120 @@ class ComisionController extends Controller
 
     public function store(Request $r)
     {
-        $u = $r->user();
+        $c = $this->svc->crear($r->user(), $this->validar($r));
 
-        $data = $r->validate([
-            'IdTipoComision' => ['required', Rule::in($this->svc->tiposPermitidos($u)->pluck('Id'))],
-            'IdPlantilla'    => ['required', Rule::exists('plantilla_documento', 'Id')->where('TipoDocumento', 'Comision')],
-            'Asunto'         => 'required|string|max:255',
-            'FechaInicio'    => 'required|date',
-            'FechaFin'       => 'nullable|date|after_or_equal:FechaInicio',
-            'profesores'     => 'required|array|min:1',
-            'profesores.*'   => [Rule::in($this->svc->profesores($u)->pluck('Id'))],
-        ], [
-            'profesores.required' => 'Selecciona al menos un profesor.',
-            'FechaFin.after_or_equal' => 'La fecha final no puede ser anterior a la inicial.',
-        ]);
-
-        $c = $this->svc->crear($u, $data);
-
-        return redirect()->route('comisiones.index')->with('ok', "Comisión creada: {$c->NOficio}");
+        return redirect()->route('comisiones.show', $c->Id)->with('ok', "Comisión creada: {$c->NOficio}");
     }
 
-    public function estado(Request $r, int $id)
+    public function update(Request $r, int $id)
+    {
+        $c = $this->buscar($r, $id, false);
+        $c = $this->svc->actualizar($r->user(), $c, $this->validar($r, true));
+
+        return redirect()->route('comisiones.show', $c->Id)->with('ok', 'Comisión actualizada.');
+    }
+
+    /** Vista previa en vivo del oficio (HTML), sin guardar. */
+    public function previa(Request $r)
+    {
+        $existente = $r->filled('_id') ? $this->buscar($r, (int) $r->_id, false) : null;
+
+        return response($this->svc->previa($r->user(), $r->all(), $existente));
+    }
+
+    private function validar(Request $r, bool $edicion = false): array
     {
         $u = $r->user();
-        $c = $this->svc->visibles($u)->findOrFail($id);
 
-        abort_if((int) $c->IdEstado >= 3, 422, 'La comisión ya está finalizada.');
+        $fechaInicio = ['required', 'date'];
+        if (!$edicion) {
+            $fechaInicio[] = 'after_or_equal:today';
+        }
 
-        $c->update(['IdEstado' => $c->IdEstado + 1, 'UpdatedBy' => $u->Matricula]);
+        return $r->validate([
+            'IdTipoComision' => ['required', Rule::in($this->svc->tiposPermitidos($u)->pluck('Id'))],
+            'IdPlantilla'    => ['required', Rule::exists('plantilla_documento', 'Id')->where('TipoDocumento', 'Comision')->where('Activo', 1)],
+            'Asunto'         => ['required', 'string', 'min:5', 'max:255'],
+            'Contexto'       => ['required', 'string', 'min:10', 'max:1000'],
+            'FechaInicio'    => $fechaInicio,
+            'FechaFin'       => ['nullable', 'date', 'after_or_equal:FechaInicio'],
+            'profesores'     => ['required', 'array', 'min:1'],
+            'profesores.*'   => [Rule::in($this->svc->profesores($u)->pluck('Id'))],
+        ], [
+            'IdTipoComision.in'          => 'Ese tipo de comisión no está disponible para ti.',
+            'Asunto.min'                 => 'El asunto debe tener al menos 5 caracteres.',
+            'Contexto.required'          => 'Describe en qué consiste la comisión (contexto).',
+            'Contexto.min'               => 'El contexto debe tener al menos 10 caracteres.',
+            'FechaInicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a hoy.',
+            'FechaFin.after_or_equal'    => 'La fecha final no puede ser anterior a la inicial.',
+            'profesores.required'        => 'Selecciona al menos un profesor.',
+            'profesores.*.in'            => 'Hay un profesor que no pertenece a tu facultad.',
+        ]);
+    }
+
+    /* ───────── estados ───────── */
+
+    public function avanzar(Request $r, int $id)
+    {
+        $this->svc->avanzar($r->user(), $this->buscar($r, $id, false));
 
         return back()->with('ok', 'Estado actualizado.');
     }
 
+    public function retroceder(Request $r, int $id)
+    {
+        $this->svc->retroceder($r->user(), $this->buscar($r, $id, false));
+
+        return back()->with('ok', 'Se regresó al estado anterior.');
+    }
+
+    public function rechazarReporte(Request $r, int $id)
+    {
+        $data = $r->validate(['Motivo' => 'required|string|min:5|max:1000'], [
+            'Motivo.required' => 'Escribe qué debe corregir el profesor.',
+            'Motivo.min'      => 'La descripción debe tener al menos 5 caracteres.',
+        ]);
+        $this->svc->rechazarReporte($r->user(), $this->buscar($r, $id, false), $data['Motivo']);
+
+        return back()->with('ok', 'Reporte rechazado; se avisó a los profesores.');
+    }
+
     public function anular(Request $r, int $id)
     {
-        $u = $r->user();
-        $c = $this->svc->visibles($u)->findOrFail($id);
+        $this->svc->anular($r->user(), $this->buscar($r, $id, false));
 
-        $c->update(['Activo' => 0, 'DeletedAt' => now(), 'DeletedBy' => $u->Matricula]);
-
-        return back()->with('ok', 'Comisión anulada.');
+        return redirect()->route('comisiones.index')->with('ok', 'Comisión anulada.');
     }
+
+    /** Deshace una anulación. */
+    public function restaurar(Request $r, int $id)
+    {
+        $c = $this->svc->visibles($r->user(), true)->findOrFail($id);
+        $this->svc->restaurar($r->user(), $c);
+
+        return back()->with('ok', 'Anulación revertida.');
+    }
+
+    /* ───────── documentos ───────── */
 
     public function pdf(Request $r, int $id)
     {
-        $c = $this->svc->visibles($r->user(), null)->findOrFail($id);
+        return $this->docs->respuestaPdf($this->buscar($r, $id)->load('facultad'));
+    }
 
-        return $this->svc->pdf($c)->stream($c->NOficio . '.pdf');
+    public function vista(Request $r, int $id)
+    {
+        return response($this->docs->html($this->buscar($r, $id)));
+    }
+
+    public function reporte(Request $r, int $id)
+    {
+        return $this->docs->descargarReporte($this->buscar($r, $id));
+    }
+
+    /** $anuladas: false = solo vigentes (para modificar), null = ambas (para consultar) */
+    private function buscar(Request $r, int $id, ?bool $anuladas = null): Comision
+    {
+        return $this->svc->visibles($r->user(), $anuladas)->findOrFail($id);
     }
 }

@@ -2,8 +2,11 @@
 
 namespace App\View\Composers;
 
+use App\Models\ChatConversacion;
+use App\Models\ChatMensaje;
 use App\Models\Facultad;
 use App\Models\Modulo;
+use App\Models\Notificacion;
 use App\Services\AccesoService;
 use Illuminate\View\View;
 
@@ -24,7 +27,7 @@ class NavegacionComposer
         $facultadActual = $user?->facultad
             ?? Facultad::where('Clave', 'FCI')->first();
 
-        $view->with([
+        $data = [
             'moduloActual'   => $moduloActual,
             'moduloEnUso'    => $moduloEnUso,
             'facultadActual' => $facultadActual,
@@ -32,6 +35,22 @@ class NavegacionComposer
             'opcionesModulo' => $moduloEnUso
                 ? $this->acceso->opcionesDe($user, $moduloEnUso->Clave)
                 : collect(),
-        ]);
+            'esProfesor'      => false,
+            'notifNoLeidas'   => 0,
+            'notifRecientes'  => collect(),
+            'chatNoLeidos'    => 0,
+        ];
+
+        if ($user) {
+            $data['esProfesor']     = $user->Rol === 'Profesor' || $user->comisiones()->exists();
+            $data['notifNoLeidas']  = Notificacion::where('IdUsuario', $user->Id)->whereNull('LeidaAt')->count();
+            $data['notifRecientes'] = Notificacion::where('IdUsuario', $user->Id)->orderByDesc('Id')->limit(8)->get();
+            $data['chatNoLeidos']   = ChatMensaje::whereNull('LeidoAt')->where('IdRemitente', '<>', $user->Id)
+                ->whereIn('IdConversacion', ChatConversacion::select('Id')
+                    ->where(fn ($q) => $q->where('IdUsuario1', $user->Id)->orWhere('IdUsuario2', $user->Id)))
+                ->count();
+        }
+
+        $view->with($data);
     }
 }

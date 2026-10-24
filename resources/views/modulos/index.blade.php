@@ -6,7 +6,7 @@
 <div class="container-fluid p-0">
     <div class="mb-4">
         <h2 class="font-syne text-dark mb-1">Mis módulos</h2>
-        <p class="text-muted small mb-0">Hola, {{ auth()->user()->Nombre }}. Elige un módulo para continuar.</p>
+        <p class="text-muted small mb-0">Hola, {{ auth()->user()->nombre_corto }}. Elige un módulo para continuar.</p>
     </div>
 
     <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3">

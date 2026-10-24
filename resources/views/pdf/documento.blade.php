@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <style>
     @page { margin: 40px 70px 100px 70px; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #000; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #000; display: flex; flex-direction: column; justify-content: between;}
     table { border-collapse: collapse; width: 100%; }
     .hdr td { vertical-align: middle; }
     .hdr .logo { width: 90px; }
@@ -22,14 +22,14 @@
     .footer { position: fixed; bottom: -70px; left: 0; right: 0; }
     .ccp { font-size: 9px; margin-bottom: 6px; }
     .addr { border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 9px; }
+    @if ($web)
+    /* Vista en pantalla (detalle / vista previa): hoja carta con márgenes y pie al final */
+    body { padding: 36px 56px; background: #fff; }
+    .footer { position: static; margin-top: 40px; }
+    @endif
 </style>
 </head>
 <body>
-
-<div class="footer">
-    <div class="ccp">{{ $doc->FirmaElaboracion }}</div>
-    <div class="addr">Edificio del Campus I. Av. 56 Esquina Av. Concordia Número 4, Colonia Benito Juárez, C.P. 24180, Cd. del Carmen, Campeche.</div>
-</div>
 
 <table class="hdr">
     <tr>
@@ -49,10 +49,12 @@
 </div>
 
 <div class="dest">
-    @foreach ($profesores as $nombre)
+    @forelse ($profesores as $nombre)
         <strong>{{ $nombre }}</strong><br>
-    @endforeach
-    PTC de la {{ $facTitulo }}<br>
+    @empty
+        <strong>(Selecciona al menos un profesor)</strong><br>
+    @endforelse
+    <strong>PTC de la {{ $facTitulo }}</strong><br>
     <strong>{{ $esConstancia ? 'A quien corresponda' : 'Presente' }}</strong>
 </div>
 
@@ -67,18 +69,23 @@
     <table>
         <tr>
             <td style="width:60%; vertical-align:bottom;">
-                <div>Atentamente,</div>
-                <div><em>Por la Grandeza de México</em></div>
+                <div><strong>Atentamente,</strong></div>
+                <div><strong><em>Por la Grandeza de México</em></strong></div>
                 <div class="firma-box">@if ($firma)<img src="{{ $firma }}">@endif</div>
                 <div class="linea"></div>
                 <div><strong>{{ $doc->DirectorNombre }}</strong></div>
-                <div>{{ $doc->DirectorCargo ?: 'Director' }} de la {{ $facTitulo }}</div>
+                <div><strong>{{ $doc->DirectorCargo ?: 'Director' }} de la {{ $facTitulo }}</strong></div>
             </td>
             <td class="sello" style="vertical-align:bottom; text-align:center;">
                 @if ($sello)<img src="{{ $sello }}">@endif
             </td>
         </tr>
     </table>
+</div>
+
+<div class="footer">
+    <div class="ccp" style="margin-bottom: 10px;">{{ $doc->FirmaElaboracion }}</div>
+    <div class="addr">Edificio del Campus I. Av. 56 Esquina Av. Concordia Número 4, Colonia Benito Juárez, C.P. 24180, Cd. del Carmen, Campeche.</div>
 </div>
 
 </body>

@@ -27,12 +27,29 @@ class Usuario extends Authenticatable
             ->where('Activo', 1)->whereNull('DeletedAt');
     }
 
+    public function tiposComision()
+    {
+        return $this->belongsToMany(TipoComision::class, 'usuario_tipo_comision', 'IdUsuario', 'IdTipoComision');
+    }
+
+    /** Comisiones que le fueron asignadas (solo o en grupo). */
+    public function comisiones()
+    {
+        return $this->belongsToMany(Comision::class, 'comision_profesor', 'IdUsuario', 'IdComision');
+    }
+
+    /** Nombre completo (para documentos oficiales). */
     public function getNombreCompletoAttribute(): string
     {
         return trim($this->Nombre . ' ' . $this->Apellido);
     }
-    public function tiposComision()
+
+    /** Primer nombre + primer apellido (para la interfaz). */
+    public function getNombreCortoAttribute(): string
     {
-        return $this->belongsToMany(TipoComision::class, 'usuario_tipo_comision', 'IdUsuario', 'IdTipoComision');
+        $n = explode(' ', trim((string) $this->Nombre))[0];
+        $a = explode(' ', trim((string) $this->Apellido))[0];
+
+        return trim("$n $a");
     }
 }

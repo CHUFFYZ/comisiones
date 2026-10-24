@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Models\Comision;
+use App\Models\ComisionLog;
 use App\Models\Constancia;
+use App\Models\EstadoComision;
 use App\Models\PlantillaDocumento;
 use App\Models\TipoComision;
 use App\Models\Usuario;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,9 +18,14 @@ use Illuminate\Validation\ValidationException;
 class ComisionService
 {
     private const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
-    private const FMT   = 'j \d\e F \d\e Y';
 
-    public function __construct(private AccesoService $acceso) {}
+    public function __construct(
+        private AccesoService $acceso,
+        private DocumentoService $docs,
+        private NotificacionService $notif,
+    ) {}
+
+    /* ───────── alcance / consultas ───────── */
 
     /** Secretaría Académica y superusuario ven todos los tipos. */
     public function veTodo(Usuario $u): bool
@@ -40,13 +47,9 @@ class ComisionService
             ->orderBy('Apellido')->orderBy('Nombre')->get();
     }
 
-    /** $anuladas: false = vigentes, true = anuladas, null = ambas */
-    public function visibles(Usuario $u, ?bool $anuladas = false): Builder
+    private function alcance(Usuario $u): Builder
     {
-        $q = Comision::query()->with(['tipo', 'estado', 'profesores', 'constancia']);
-
-        if ($anuladas === true)  $q->whereNotNull('DeletedAt');
-        if ($anuladas === false) $q->whereNull('DeletedAt');
+        $q = Comision::query();
 
         if (!$this->acceso->esSuperUsuario($u)) {
             $q->where('IdFacultad', $u->IdFacultad);
@@ -55,14 +58,36 @@ class ComisionService
             $q->whereIn('IdTipoComision', $u->tiposComision()->pluck('tipo_comision.Id'));
         }
 
+        return $q;
+    }
+
+    /** $anuladas: false = vigentes, true = anuladas, null = ambas */
+    public function visibles(Usuario $u, ?bool $anuladas = false): Builder
+    {
+        $q = $this->alcance($u)->with(['tipo', 'estado', 'profesores', 'constancia']);
+
+        if ($anuladas === true)  $q->whereNotNull('DeletedAt');
+        if ($anuladas === false) $q->whereNull('DeletedAt');
+
         return $q->orderByDesc('Id');
     }
+
+    /** Comisiones asignadas al profesor (solo o en grupo). */
+    public function delProfesor(Usuario $u): Builder
+    {
+        return Comision::query()->whereNull('DeletedAt')
+            ->whereHas('profesores', fn ($q) => $q->where('usuario.Id', $u->Id))
+            ->with(['tipo', 'estado', 'profesores', 'constancia', 'facultad'])
+            ->orderByDesc('Id');
+    }
+
+    /* ───────── crear / modificar ───────── */
 
     public function crear(Usuario $u, array $d): Comision
     {
         $snap = $this->snapshots($u, $u->IdFacultad);
 
-        return DB::transaction(function () use ($u, $d, $snap) {
+        $c = DB::transaction(function () use ($u, $d, $snap) {
             $c = Comision::create([
                 'IdTipoComision' => $d['IdTipoComision'],
                 'IdPlantilla'    => $d['IdPlantilla'],
@@ -70,6 +95,7 @@ class ComisionService
                 'IdFacultad'     => $u->IdFacultad,
                 'NOficio'        => $this->nuevoOficio($u->facultad->Clave),
                 'Asunto'         => $d['Asunto'],
+                'Contexto'       => $d['Contexto'],
                 'FechaEmision'   => now(),
                 'FechaInicio'    => $d['FechaInicio'],
                 'FechaFin'       => $d['FechaFin'] ?? null,
@@ -80,10 +106,175 @@ class ComisionService
             ]);
 
             $c->profesores()->sync($d['profesores']);
+            $this->log($c, $u, 'Comisión creada');
 
             return $c;
         });
+
+        $c->load(['facultad', 'tipo', 'profesores', 'plantilla']);
+        $this->docs->guardarOficio($c);
+        $this->notif->asignacion($c, $c->profesores->pluck('Id'));
+
+        return $c;
     }
+
+    public function actualizar(Usuario $u, Comision $c, array $d): Comision
+    {
+        $antes = $c->profesores()->pluck('usuario.Id')->map(fn ($i) => (int) $i);
+
+        DB::transaction(function () use ($u, $c, $d) {
+            $c->update([
+                'IdTipoComision' => $d['IdTipoComision'],
+                'IdPlantilla'    => $d['IdPlantilla'],
+                'Asunto'         => $d['Asunto'],
+                'Contexto'       => $d['Contexto'],
+                'FechaInicio'    => $d['FechaInicio'],
+                'FechaFin'       => $d['FechaFin'] ?? null,
+                'UpdatedBy'      => $u->Matricula,
+            ]);
+            $c->profesores()->sync($d['profesores']);
+            $this->log($c, $u, 'Comisión modificada');
+        });
+
+        $c = $c->fresh(['facultad', 'tipo', 'profesores', 'plantilla', 'constancia']);
+
+        // Se reescriben los archivos guardados (oficio y, si existe, constancia)
+        $this->docs->guardarOficio($c);
+        if ($c->constancia) {
+            $this->docs->guardarConstancia($c, $c->constancia);
+        }
+
+        $nuevos = collect($d['profesores'])->map(fn ($i) => (int) $i)->diff($antes);
+        if ($nuevos->isNotEmpty()) {
+            $this->notif->asignacion($c, $nuevos);
+        }
+
+        return $c;
+    }
+
+    /** Vista previa HTML sin guardar nada. $existente = comisión que se está editando. */
+    public function previa(Usuario $u, array $in, ?Comision $existente = null): string
+    {
+        $c = $existente ? $existente->replicate() : new Comision();
+
+        if (!$existente) {
+            $c->fill([
+                ...$this->snapshots($u, $u->IdFacultad, false),
+                'NOficio'      => $this->nuevoOficio($u->facultad->Clave, false),
+                'FechaEmision' => now(),
+            ]);
+        }
+
+        $c->fill([
+            'Asunto'      => $in['Asunto'] ?? '',
+            'Contexto'    => $in['Contexto'] ?? '',
+            'FechaInicio' => !empty($in['FechaInicio']) ? $in['FechaInicio'] : now()->toDateString(),
+            'FechaFin'    => !empty($in['FechaFin']) ? $in['FechaFin'] : null,
+        ]);
+
+        $tipo = TipoComision::find($in['IdTipoComision'] ?? 0) ?? new TipoComision(['Nombre' => '', 'Descripcion' => '']);
+        $plantilla = PlantillaDocumento::find($in['IdPlantilla'] ?? 0)
+            ?? PlantillaDocumento::where('TipoDocumento', 'Comision')->where('Activo', 1)->firstOrFail();
+        $ids = collect($in['profesores'] ?? [])->map(fn ($i) => (int) $i);
+
+        $c->setRelation('tipo', $tipo);
+        $c->setRelation('plantilla', $plantilla);
+        $c->setRelation('facultad', $u->facultad);
+        $c->setRelation('profesores', $this->profesores($u)->whereIn('Id', $ids)->values());
+
+        return $this->docs->html($c);
+    }
+
+    /* ───────── estados ───────── */
+
+    /** Secretaría: 1→2→3 (solo estados principales). */
+    public function avanzar(Usuario $u, Comision $c): void
+    {
+        abort_unless(in_array((int) $c->IdEstado, [1, 2], true), 422, 'No se puede avanzar desde este estado.');
+        $this->cambiar($c, $u, (int) $c->IdEstado + 1, 'Estado avanzado');
+    }
+
+    /** 3→2→1; si está rechazado/refutado vuelve a Finalizado. */
+    public function retroceder(Usuario $u, Comision $c): void
+    {
+        $nuevo = match ((int) $c->IdEstado) {
+            2 => 1, 3 => 2, 4, 5 => 3,
+            default => abort(422, 'La comisión ya está en el primer estado.'),
+        };
+        $this->cambiar($c, $u, $nuevo, 'Estado revertido');
+    }
+
+    /** Profesor: Iniciado → En proceso. */
+    public function iniciar(Usuario $u, Comision $c): void
+    {
+        abort_unless((int) $c->IdEstado === 1, 422, 'La comisión ya fue iniciada.');
+        $this->cambiar($c, $u, 2, 'Comisión iniciada');
+    }
+
+    /**
+     * Profesor: sube el reporte (reemplaza el anterior, aunque sea de otro del grupo).
+     * En proceso o Rechazado → Finalizado.
+     */
+    public function enviarReporte(Usuario $u, Comision $c, UploadedFile $f): void
+    {
+        abort_if((int) $c->IdEstado === 1, 422, 'Primero marca la comisión como En proceso.');
+
+        $estabaRechazado = (int) $c->IdEstado === 4;
+        $this->docs->guardarReporte($c, $f, $u);
+
+        if (in_array((int) $c->IdEstado, [2, 4], true)) {
+            $this->cambiar($c, $u, 3, $estabaRechazado ? 'Reporte corregido' : 'Reporte enviado');
+        } else {
+            $this->log($c, $u, 'Reporte reemplazado');
+        }
+    }
+
+    /** Secretaría: rechaza el reporte con descripción → Rechazado. */
+    public function rechazarReporte(Usuario $u, Comision $c, string $motivo): void
+    {
+        abort_unless((int) $c->IdEstado === 3 && $c->ReporteRuta, 422, 'No hay un reporte finalizado que rechazar.');
+        $this->cambiar($c, $u, 4, 'Reporte rechazado', $motivo);
+    }
+
+    /** Profesor: refuta la constancia con descripción → Refutado. */
+    public function refutarConstancia(Usuario $u, Comision $c, string $motivo): void
+    {
+        abort_unless((int) $c->IdEstado === 3 && $c->constancia, 422, 'No hay una constancia que refutar.');
+        $this->cambiar($c, $u, 5, 'Constancia refutada', $motivo);
+    }
+
+    public function anular(Usuario $u, Comision $c): void
+    {
+        $c->update(['Activo' => 0, 'DeletedAt' => now(), 'DeletedBy' => $u->Matricula]);
+        $this->log($c, $u, 'Comisión anulada');
+    }
+
+    public function restaurar(Usuario $u, Comision $c): void
+    {
+        $c->update(['Activo' => 1, 'DeletedAt' => null, 'DeletedBy' => null, 'UpdatedBy' => $u->Matricula]);
+        $this->log($c, $u, 'Anulación revertida');
+    }
+
+    private function cambiar(Comision $c, Usuario $u, int $estado, string $accion, ?string $desc = null): void
+    {
+        $c->update(['IdEstado' => $estado, 'UpdatedBy' => $u->Matricula]);
+        $this->log($c, $u, $accion, $desc);
+        $this->notif->cambioEstado($c, $u, $accion, $desc);
+    }
+
+    public function log(Comision $c, Usuario $u, string $accion, ?string $desc = null): void
+    {
+        ComisionLog::create([
+            'IdComision'  => $c->Id,
+            'IdEstado'    => $c->IdEstado,
+            'Accion'      => $accion,
+            'Descripcion' => $desc,
+            'IdUsuario'   => $u->Id,
+            'CreatedAt'   => now(),
+        ]);
+    }
+
+    /* ───────── constancias ───────── */
 
     public function crearConstancia(Usuario $u, Comision $c): Constancia
     {
@@ -96,132 +287,133 @@ class ComisionService
         $plantilla = PlantillaDocumento::where('TipoDocumento', 'Constancia')
             ->where('Activo', 1)->latest('Id')->firstOrFail();
 
-        return Constancia::create([
+        $k = Constancia::create([
             'IdComision'       => $c->Id,
             'IdPlantilla'      => $plantilla->Id,
+            'Contexto'         => $c->Contexto,
             'FechaElaboracion' => now(),
             ...$this->snapshots($u, $c->IdFacultad),
             'Activo'           => 1,
             'CreatedAt'        => now(),
             'CreatedBy'        => $u->Matricula,
         ]);
+
+        $c->loadMissing('facultad');
+        $this->docs->guardarConstancia($c, $k);
+        $this->log($c, $u, 'Constancia generada');
+        $this->notif->constancia($c, $u, 'generada');
+
+        return $k;
     }
 
-    public function pdf(Comision $c, ?Constancia $k = null)
+    /** Modifica el contexto y reescribe el PDF guardado. Si estaba refutada, vuelve a Finalizado. */
+    public function actualizarConstancia(Usuario $u, Comision $c, string $contexto): Constancia
     {
-        $doc  = $k ?? $c;
-        $p    = $doc->plantilla;
-        $esC  = $k !== null;
-        $profes = $c->profesores()->orderBy('Apellido')->get();
+        $k = $c->constancia;
+        abort_unless($k, 404, 'La comisión no tiene constancia.');
 
-        $contexto = $p->Contexto ?: $this->minuscula((string) $c->tipo->Descripcion);
-        $cierre   = str_replace('{fechas}', $this->fechas($c), (string) $p->Cierre);
+        $k->update(['Contexto' => $contexto, 'FechaElaboracion' => now(), 'UpdatedBy' => $u->Matricula]);
+        $c->loadMissing('facultad');
+        $this->docs->guardarConstancia($c, $k->fresh());
 
-        $saludo = $profes->count() > 1
-            ? 'Estimados maestros,'
-            : ((int) $profes->first()?->Genero === 1 ? 'Estimada maestra,' : 'Estimado maestro,');
+        if ((int) $c->IdEstado === 5) {
+            $this->cambiar($c, $u, 3, 'Constancia corregida');
+        } else {
+            $this->log($c, $u, 'Constancia modificada');
+        }
+        $this->notif->constancia($c, $u, 'actualizada');
 
-        $fecha = ($esC ? $k->FechaElaboracion : $c->FechaEmision)->locale('es')->translatedFormat(self::FMT);
-
-        return Pdf::loadView('pdf.documento', [
-            'p'           => $p,
-            'c'           => $c,
-            'doc'         => $doc,
-            'esConstancia'=> $esC,
-            'fechaDoc'    => $fecha,
-            'asunto'      => $esC ? 'Constancia de cumplimiento' : $c->Asunto,
-            'profesores'  => $profes->map(fn ($x) => $this->nombreConGrado($x)),
-            'saludo'      => $saludo,
-            'cuerpo'      => trim($p->Introduccion) . ' ' . $contexto . $cierre,
-            'facTitulo'   => $this->titulo((string) $p->Facultad),
-            'logoIzq'     => $this->img($p->LogoIzquierdo),
-            'logoDer'     => $this->img($p->LogoDerecho),
-            'firma'       => $this->img($doc->DirectorFirmaUrl),
-            'sello'       => $this->img($doc->DirectorSelloUrl),
-        ])->setPaper('letter')->setOption('isRemoteEnabled', true);
+        return $k;
     }
 
-    public function nombreConGrado(Usuario $u): string
+    public function eliminarConstancia(Usuario $u, Comision $c): void
     {
-        $g = trim((string) $u->GradoAcademico);
-        if ($g !== '' && !str_ends_with($g, '.')) $g .= '.';
+        $k = $c->constancia;
+        abort_unless($k, 404, 'La comisión no tiene constancia.');
 
-        return preg_replace('/\s+/', ' ', trim("$g {$u->Nombre} {$u->Apellido}"));
+        $k->update(['Activo' => 0, 'DeletedAt' => now(), 'DeletedBy' => $u->Matricula]);
+        $c->loadMissing('facultad');
+        $this->docs->borrarConstancia($c);
+
+        if ((int) $c->IdEstado === 5) {
+            $this->cambiar($c, $u, 3, 'Constancia eliminada');
+        } else {
+            $this->log($c, $u, 'Constancia eliminada');
+        }
+    }
+
+    /* ───────── estadísticas del módulo ───────── */
+
+    public function estadisticas(Usuario $u): array
+    {
+        $vig = fn () => $this->alcance($u)->whereNull('DeletedAt');
+
+        $porEstado = $vig()->selectRaw('IdEstado, COUNT(*) AS n')->groupBy('IdEstado')->pluck('n', 'IdEstado');
+        $estados = EstadoComision::where('Activo', 1)->orderBy('Id')->get()->map(fn ($e) => [
+            'id' => $e->Id, 'nombre' => $e->Nombre, 'n' => (int) ($porEstado[$e->Id] ?? 0),
+            'clase' => Comision::CLASES[$e->Id] ?? '',
+        ]);
+
+        $nombresTipo = TipoComision::pluck('Nombre', 'Id');
+        $tipos = $vig()->selectRaw('IdTipoComision, COUNT(*) AS n')->groupBy('IdTipoComision')->pluck('n', 'IdTipoComision')
+            ->mapWithKeys(fn ($n, $id) => [($nombresTipo[$id] ?? "Tipo $id") => (int) $n]);
+
+        $porMes = $vig()->where('FechaInicio', '>=', now()->subMonths(5)->startOfMonth()->toDateString())
+            ->selectRaw("DATE_FORMAT(FechaInicio, '%Y-%m') AS ym, COUNT(*) AS n")->groupBy('ym')->pluck('n', 'ym');
+        $meses = collect(range(5, 0))->map(function ($i) use ($porMes) {
+            $m = now()->subMonths($i);
+            return ['label' => self::MESES[$m->month - 1] . ' ' . $m->format('y'), 'n' => (int) ($porMes[$m->format('Y-m')] ?? 0)];
+        });
+
+        $sinConstancia = $vig()->where('IdEstado', 3)->whereDoesntHave('constancia');
+        $porVencer = $vig()->where('IdEstado', '<', 3)->whereNotNull('FechaFin')
+            ->whereDate('FechaFin', '<=', now()->addDays(3)->toDateString());
+
+        return [
+            'total'         => (int) $porEstado->sum(),
+            'estados'       => $estados,
+            'tipos'         => $tipos,
+            'meses'         => $meses,
+            'sinConstancia' => ['n' => (clone $sinConstancia)->count(), 'lista' => $sinConstancia->orderByDesc('Id')->limit(5)->get()],
+            'porVencer'     => ['n' => (clone $porVencer)->count(), 'lista' => $porVencer->orderBy('FechaFin')->limit(5)->get()],
+            'anuladas'      => $this->alcance($u)->whereNotNull('DeletedAt')->count(),
+        ];
     }
 
     /* ───────── internos ───────── */
 
     /** Snapshots inmutables: director vigente de la facultad + iniciales de quien elabora. */
-    private function snapshots(Usuario $u, int $idFacultad): array
+    private function snapshots(Usuario $u, int $idFacultad, bool $estricto = true): array
     {
         $dir = Usuario::where('Rol', 'Director')->where('IdFacultad', $idFacultad)->where('Activo', 1)->first();
 
-        if (!$dir) {
+        if (!$dir && $estricto) {
             throw ValidationException::withMessages(['general' => 'No hay un Director activo registrado en la facultad.']);
         }
 
         $ini = $u->Iniciales ?: strtolower(mb_substr((string) $u->Nombre, 0, 1) . mb_substr((string) $u->Apellido, 0, 1));
 
         return [
-            'DirectorNombre'   => $this->nombreConGrado($dir),
-            'DirectorCargo'    => (int) $dir->Genero === 1 ? 'Directora' : 'Director',
-            'DirectorFirmaUrl' => $dir->FirmaUrl,
-            'DirectorSelloUrl' => $dir->SelloUrl,
+            'DirectorNombre'   => $dir ? $this->docs->nombreConGrado($dir) : '',
+            'DirectorCargo'    => $dir && (int) $dir->Genero === 1 ? 'Directora' : 'Director',
+            'DirectorFirmaUrl' => $dir?->FirmaUrl,
+            'DirectorSelloUrl' => $dir?->SelloUrl,
             'FirmaElaboracion' => 'C.c.p. Archivo ' . $u->facultad->Clave . '/' . $ini,
         ];
     }
 
-    /** FCI-COMISION-2025-NOV-005 (consecutivo por facultad/año/mes; no reutiliza anuladas) */
-    private function nuevoOficio(string $facultad): string
+    /** FCI-COMISION-2026-NOV-005 (consecutivo por facultad/año/mes; no reutiliza anuladas) */
+    private function nuevoOficio(string $facultad, bool $bloquear = true): string
     {
         $f      = now();
         $prefix = sprintf('%s-COMISION-%d-%s', $facultad, $f->year, self::MESES[$f->month - 1]);
 
-        $ultimo = Comision::where('NOficio', 'like', $prefix . '-%')->lockForUpdate()->pluck('NOficio')
+        $q = Comision::where('NOficio', 'like', $prefix . '-%');
+        if ($bloquear) $q->lockForUpdate();
+
+        $ultimo = $q->pluck('NOficio')
             ->map(fn ($n) => (int) substr($n, strrpos($n, '-') + 1))->max() ?? 0;
 
         return $prefix . '-' . str_pad($ultimo + 1, 3, '0', STR_PAD_LEFT);
-    }
-
-    private function fechas(Comision $c): string
-    {
-        $i = $c->FechaInicio->copy()->locale('es');
-        $f = $c->FechaFin?->copy()->locale('es');
-
-        if (!$f || $f->isSameDay($i))           return 'el ' . $i->translatedFormat(self::FMT);
-        if ($i->format('Ym') === $f->format('Ym')) return 'del ' . $i->day . ' al ' . $f->translatedFormat(self::FMT);
-        if ($i->year === $f->year)              return 'del ' . $i->translatedFormat('j \d\e F') . ' al ' . $f->translatedFormat(self::FMT);
-
-        return 'del ' . $i->translatedFormat(self::FMT) . ' al ' . $f->translatedFormat(self::FMT);
-    }
-
-    private function minuscula(string $t): string
-    {
-        return mb_strtolower(mb_substr($t, 0, 1)) . mb_substr($t, 1);
-    }
-
-    private function titulo(string $t): string
-    {
-        $menores = ['de', 'la', 'del', 'y', 'en', 'el', 'los', 'las'];
-        $w = explode(' ', mb_strtolower($t));
-        foreach ($w as $i => $x) {
-            if ($i === 0 || !in_array($x, $menores)) {
-                $w[$i] = mb_strtoupper(mb_substr($x, 0, 1)) . mb_substr($x, 1);
-            }
-        }
-        return implode(' ', $w);
-    }
-
-    /** URL http(s) tal cual; ruta local → archivo en public/ o storage/app/public */
-    private function img(?string $u): ?string
-    {
-        if (!$u) return null;
-        if (preg_match('#^https?://#i', $u)) return $u;
-
-        $rel = ltrim($u, '/');
-        foreach ([public_path($rel), storage_path('app/public/' . preg_replace('#^storage/#', '', $rel))] as $ruta) {
-            if (is_file($ruta)) return $ruta;
-        }
-        return null;
     }
 }

@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\ModuloController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ComisionController;
 use App\Http\Controllers\ConstanciaController;
+use App\Http\Controllers\ModuloController;
+use App\Http\Controllers\NotificacionController;
+use App\Http\Controllers\ProfesorController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('publico.inicio'))->name('inicio');
@@ -21,21 +24,67 @@ Route::middleware('auth')->group(function () {
         ->middleware('modulo.acceso:leer')
         ->name('modulos.show');
 
-   Route::prefix('modulos/MSC')->group(function () {
-    Route::prefix('comisiones')->name('comisiones.')->group(function () {
-        Route::get('/',                [ComisionController::class, 'index'])->middleware('modulo.acceso:leer,MSC')->name('index');
-        Route::get('/crear',           [ComisionController::class, 'create'])->middleware('modulo.acceso:crear,MSC')->name('create');
-        Route::post('/',               [ComisionController::class, 'store'])->middleware('modulo.acceso:crear,MSC')->name('store');
-        Route::get('/anuladas',        [ComisionController::class, 'anuladas'])->middleware('modulo.acceso:eliminar,MSC')->name('anuladas');
-        Route::get('/{id}/pdf',        [ComisionController::class, 'pdf'])->whereNumber('id')->middleware('modulo.acceso:leer,MSC')->name('pdf');
-        Route::patch('/{id}/estado',   [ComisionController::class, 'estado'])->whereNumber('id')->middleware('modulo.acceso:actualizar,MSC')->name('estado');
-        Route::delete('/{id}',         [ComisionController::class, 'anular'])->whereNumber('id')->middleware('modulo.acceso:eliminar,MSC')->name('anular');
+    /* ── SisComisiones (secretaría) ── */
+    Route::prefix('modulos/MSC')->group(function () {
+        Route::prefix('comisiones')->name('comisiones.')->where(['id' => '[0-9]+'])->group(function () {
+            Route::get('/',               [ComisionController::class, 'index'])->middleware('modulo.acceso:leer,MSC')->name('index');
+            Route::get('/crear',          [ComisionController::class, 'create'])->middleware('modulo.acceso:crear,MSC')->name('create');
+            Route::post('/',              [ComisionController::class, 'store'])->middleware('modulo.acceso:crear,MSC')->name('store');
+            Route::post('/previa',        [ComisionController::class, 'previa'])->middleware('modulo.acceso:crear,MSC')->name('previa');
+            Route::get('/anuladas',       [ComisionController::class, 'anuladas'])->middleware('modulo.acceso:eliminar,MSC')->name('anuladas');
+
+            Route::get('/{id}',           [ComisionController::class, 'show'])->middleware('modulo.acceso:leer,MSC')->name('show');
+            Route::get('/{id}/editar',    [ComisionController::class, 'edit'])->middleware('modulo.acceso:actualizar,MSC')->name('edit');
+            Route::put('/{id}',           [ComisionController::class, 'update'])->middleware('modulo.acceso:actualizar,MSC')->name('update');
+            Route::get('/{id}/pdf',       [ComisionController::class, 'pdf'])->middleware('modulo.acceso:leer,MSC')->name('pdf');
+            Route::get('/{id}/vista',     [ComisionController::class, 'vista'])->middleware('modulo.acceso:leer,MSC')->name('vista');
+            Route::get('/{id}/reporte',   [ComisionController::class, 'reporte'])->middleware('modulo.acceso:leer,MSC')->name('reporte');
+
+            Route::patch('/{id}/avanzar',         [ComisionController::class, 'avanzar'])->middleware('modulo.acceso:actualizar,MSC')->name('avanzar');
+            Route::patch('/{id}/retroceder',      [ComisionController::class, 'retroceder'])->middleware('modulo.acceso:actualizar,MSC')->name('retroceder');
+            Route::patch('/{id}/rechazar-reporte',[ComisionController::class, 'rechazarReporte'])->middleware('modulo.acceso:actualizar,MSC')->name('rechazar');
+            Route::patch('/{id}/restaurar',       [ComisionController::class, 'restaurar'])->middleware('modulo.acceso:eliminar,MSC')->name('restaurar');
+            Route::delete('/{id}',                [ComisionController::class, 'anular'])->middleware('modulo.acceso:eliminar,MSC')->name('anular');
+        });
+
+        // store/update/destroy: {id} = comisión · pdf/vista: {id} = constancia
+        Route::prefix('constancias')->name('constancias.')->where(['id' => '[0-9]+'])->group(function () {
+            Route::post('/{id}',     [ConstanciaController::class, 'store'])->middleware('modulo.acceso:actualizar,MSC')->name('store');
+            Route::patch('/{id}',    [ConstanciaController::class, 'update'])->middleware('modulo.acceso:actualizar,MSC')->name('update');
+            Route::delete('/{id}',   [ConstanciaController::class, 'destroy'])->middleware('modulo.acceso:eliminar,MSC')->name('destroy');
+            Route::get('/{id}/pdf',  [ConstanciaController::class, 'pdf'])->middleware('modulo.acceso:leer,MSC')->name('pdf');
+            Route::get('/{id}/vista',[ConstanciaController::class, 'vista'])->middleware('modulo.acceso:leer,MSC')->name('vista');
+        });
     });
 
-    Route::prefix('constancias')->name('constancias.')->group(function () {
-        Route::get('/',            [ConstanciaController::class, 'index'])->middleware('modulo.acceso:actualizar,MSC')->name('index');
-        Route::post('/{id}',       [ConstanciaController::class, 'store'])->whereNumber('id')->middleware('modulo.acceso:actualizar,MSC')->name('store');
-        Route::get('/{id}/pdf',    [ConstanciaController::class, 'pdf'])->whereNumber('id')->middleware('modulo.acceso:leer,MSC')->name('pdf');
+    /* ── Panel del profesor (solo ve lo que se le asignó) ── */
+    Route::prefix('mi-panel')->name('profesor.')->where(['id' => '[0-9]+'])->group(function () {
+        Route::get('/',                       [ProfesorController::class, 'panel'])->name('panel');
+        Route::get('/{id}',                   [ProfesorController::class, 'show'])->name('show');
+        Route::patch('/{id}/iniciar',         [ProfesorController::class, 'iniciar'])->name('iniciar');
+        Route::post('/{id}/reporte',          [ProfesorController::class, 'reporte'])->name('reporte');
+        Route::get('/{id}/reporte',           [ProfesorController::class, 'descargarReporte'])->name('reporte.descargar');
+        Route::patch('/{id}/refutar',         [ProfesorController::class, 'refutar'])->name('refutar');
+        Route::get('/{id}/{doc}/{formato}',   [ProfesorController::class, 'documento'])
+            ->where(['doc' => 'oficio|constancia', 'formato' => 'vista|pdf'])->name('documento');
     });
-});
+
+    /* ── Chat ── */
+    Route::prefix('chat')->name('chat.')->group(function () {
+        Route::get('/',                          [ChatController::class, 'index'])->name('index');
+        Route::get('/usuarios',                  [ChatController::class, 'usuarios'])->name('usuarios');
+        Route::get('/conversaciones',            [ChatController::class, 'conversaciones'])->name('conversaciones');
+        Route::post('/conversaciones',           [ChatController::class, 'abrir'])->name('abrir');
+        Route::get('/supervision',               [ChatController::class, 'supervision'])->name('supervision');
+        Route::get('/supervision/{id}',          [ChatController::class, 'supervisionMensajes'])->whereNumber('id')->name('supervision.mensajes');
+        Route::get('/{id}/mensajes',             [ChatController::class, 'mensajes'])->whereNumber('id')->name('mensajes');
+        Route::post('/{id}/mensajes',            [ChatController::class, 'enviar'])->whereNumber('id')->name('enviar');
+    });
+
+    /* ── Notificaciones ── */
+    Route::prefix('notificaciones')->name('notificaciones.')->group(function () {
+        Route::get('/',                 [NotificacionController::class, 'index'])->name('index');
+        Route::post('/leer-todas',      [NotificacionController::class, 'leerTodas'])->name('leer_todas');
+        Route::get('/{id}/ir',          [NotificacionController::class, 'ir'])->whereNumber('id')->name('ir');
+    });
 });

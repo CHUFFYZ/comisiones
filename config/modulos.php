@@ -16,11 +16,11 @@ return [
     'modulo_global' => 'MGSU',
 
     // Opciones por módulo. 'accion' = permiso mínimo requerido
+    // (Constancias ya no es opción: se gestiona dentro de cada comisión)
     'opciones' => [
         'MSC' => [
             ['nombre' => 'Ver comisiones',  'icono' => 'fa-list',        'ruta' => 'comisiones.index',      'accion' => 'leer'],
             ['nombre' => 'Nueva comisión',  'icono' => 'fa-plus',        'ruta' => 'comisiones.create',     'accion' => 'crear'],
-            ['nombre' => 'Constancias',     'icono' => 'fa-certificate', 'ruta' => 'constancias.index',     'accion' => 'actualizar'],
             ['nombre' => 'Anulaciones',     'icono' => 'fa-ban',         'ruta' => 'comisiones.anuladas',   'accion' => 'eliminar'],
         ],
         'MA' => [

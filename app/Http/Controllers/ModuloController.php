@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Services\AccesoService;
+use App\Services\ComisionService;
 use Illuminate\Http\Request;
 
 class ModuloController extends Controller
 {
-    public function __construct(private AccesoService $acceso) {}
+    public function __construct(private AccesoService $acceso, private ComisionService $comisiones) {}
 
     /** "Mis módulos": solo los que el usuario puede ver */
     public function index(Request $request)
@@ -27,6 +28,8 @@ class ModuloController extends Controller
             'modulo'   => $modulo,
             'permiso'  => $this->acceso->letrasEn($user, $modulo->Clave),
             'opciones' => $this->acceso->opcionesDe($user, $modulo->Clave),
+            // Tablero de comisiones solo para SisComisiones; el resto conserva sus accesos
+            'stats'    => $modulo->Clave === 'MSC' ? $this->comisiones->estadisticas($user) : null,
         ]);
     }
 }

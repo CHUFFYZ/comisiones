@@ -1,18 +1,52 @@
 <!-- resources/views/components/sidebar.blade.php -->
-<div class="offcanvas-lg offcanvas-start sidebar-wrapper flex-shrink-0 p-3" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
-    <div class="offcanvas-header border-bottom mb-2 pb-2">
-        <h5 class="offcanvas-title font-syne text-dark" id="sidebarOffcanvasLabel">Menú Principal</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebarOffcanvas" aria-label="Close"></button>
+<aside class="sidebar-wrapper" id="sidebar" aria-label="Menú principal">
+    <!-- Marca: ocupa la parte superior del lado izquierdo -->
+    <div class="sidebar-brand d-flex align-items-center justify-content-between px-3">
+        <a href="{{ route('inicio') }}" class="d-flex align-items-center gap-2 text-white">
+            <img src="{{ asset('img/logo.png') }}" alt="Logo" class="app-logo"
+                 onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none')">
+            <i class="fa-solid fa-building-columns fs-4 d-none"></i>
+            <div class="lh-1">
+                <div class="font-syne fw-bold fs-6 text-white">CATI</div>
+                <small class="text-white-50 text-xs" title="{{ $facultadActual->Nombre ?? '' }}">{{ $facultadActual->Clave ?? 'FCI' }} | UNACAR</small>
+            </div>
+        </a>
+        <button type="button" class="btn-close btn-close-white d-lg-none" data-menu-toggle aria-label="Cerrar menú"></button>
     </div>
 
-    <div class="offcanvas-body flex-column p-0">
+    <div class="sidebar-body">
 
-        {{-- Navegación global: Panel principal + Mis módulos (colapsable) --}}
+        {{-- Navegación global --}}
         <ul class="nav nav-pills flex-column mb-2">
             <li class="nav-item mb-1">
                 <a href="{{ route('inicio') }}" class="nav-link {{ request()->routeIs('inicio') ? 'active' : '' }}">
                     <i class="fa-solid fa-house w-20px"></i>
                     <span>Panel principal</span>
+                </a>
+            </li>
+
+            @if ($esProfesor)
+                <li class="nav-item mb-1">
+                    <a href="{{ route('profesor.panel') }}" class="nav-link {{ request()->routeIs('profesor.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-chalkboard-user w-20px"></i>
+                        <span>Mis comisiones</span>
+                    </a>
+                </li>
+            @endif
+
+            <li class="nav-item mb-1">
+                <a href="{{ route('chat.index') }}" class="nav-link {{ request()->routeIs('chat.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-comments w-20px"></i>
+                    <span>Chat</span>
+                    @if ($chatNoLeidos > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $chatNoLeidos }}</span>@endif
+                </a>
+            </li>
+
+            <li class="nav-item mb-1">
+                <a href="{{ route('notificaciones.index') }}" class="nav-link {{ request()->routeIs('notificaciones.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-bell w-20px"></i>
+                    <span>Notificaciones</span>
+                    @if ($notifNoLeidas > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $notifNoLeidas }}</span>@endif
                 </a>
             </li>
 
@@ -91,7 +125,7 @@
             <small class="text-muted d-block text-xs">{{ $facultadActual->Clave ?? 'FCI' }} · UNACAR 2026</small>
         </div>
     </div>
-</div>
+</aside>
 
 @push('scripts')
 <script>

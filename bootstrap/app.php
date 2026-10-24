@@ -16,7 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'modulo.acceso' => VerificarAccesoModulo::class,
         ]);
-        $middleware->redirectUsersTo(fn () => route('modulos.index'));
+        $middleware->redirectUsersTo(fn () => auth()->user()?->Rol === 'Profesor'
+            ? route('profesor.panel')
+            : route('modulos.index'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
