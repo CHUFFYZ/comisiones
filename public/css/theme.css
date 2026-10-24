@@ -243,7 +243,7 @@ html.menu-open .menu-fondo { display: block; }
 
 /* Tarjetas de indicadores del tablero */
 .stat-card { padding: 1rem 1.25rem; }
-.stat-card .stat-num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.9rem; line-height: 1; color: var(--azul); }
+.stat-card .stat-num { font-family: 'Syne', sans-serif; font-weight: 750; font-size: 2rem; line-height: 1; color: var(--azul); }
 .stat-card .stat-label { font-size: .75rem; color: var(--gris); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
 .stat-icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
 
