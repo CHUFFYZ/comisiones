@@ -31,8 +31,8 @@ class NotificacionService
     /** Quien elaboró la comisión + Secretaría Académica de la facultad. */
     public function secretaria(Comision $c): Collection
     {
-        $ids = Usuario::where('Activo', 1)->where('IdFacultad', $c->IdFacultad)
-            ->where('Rol', 'SecretariaAcademica')->pluck('Id');
+        $ids = Usuario::deRol('SecretariaAcademica')->where('Activo', 1)
+            ->where('IdFacultad', $c->IdFacultad)->pluck('Id');
         $creador = Usuario::where('Matricula', $c->CreatedBy)->value('Id');
 
         return $ids->push($creador)->filter()->unique()->values();

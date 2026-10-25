@@ -17,28 +17,31 @@ class ConstanciaController extends Controller
 
     public function store(Request $r, int $id)
     {
-        $c = $this->svc->visibles($r->user())->findOrFail($id);
-        $this->svc->crearConstancia($r->user(), $c);
+        $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
+        $this->svc->crearConstancia($this->actor($r), $c);
 
         return back()->with('ok', 'Constancia generada.');
     }
 
     public function update(Request $r, int $id)
     {
-        $data = $r->validate(['Contexto' => 'required|string|min:10|max:1000'], [
+        $data = $r->validate([
+            'Contexto' => 'required|string|min:10|max:1000',
+            'Cierre'   => 'nullable|string|max:1000',
+        ], [
             'Contexto.required' => 'El contexto de la constancia es obligatorio.',
             'Contexto.min'      => 'El contexto debe tener al menos 10 caracteres.',
         ]);
-        $c = $this->svc->visibles($r->user())->findOrFail($id);
-        $this->svc->actualizarConstancia($r->user(), $c, $data['Contexto']);
+        $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
+        $this->svc->actualizarConstancia($this->actor($r), $c, $data['Contexto'], $data['Cierre'] ?? null);
 
         return back()->with('ok', 'Constancia actualizada.');
     }
 
     public function destroy(Request $r, int $id)
     {
-        $c = $this->svc->visibles($r->user())->findOrFail($id);
-        $this->svc->eliminarConstancia($r->user(), $c);
+        $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
+        $this->svc->eliminarConstancia($this->actor($r), $c);
 
         return back()->with('ok', 'Constancia eliminada.');
     }
@@ -60,7 +63,7 @@ class ConstanciaController extends Controller
     private function buscar(Request $r, int $id): array
     {
         $k = Constancia::with('plantilla')->where('Activo', 1)->findOrFail($id);
-        $c = $this->svc->visibles($r->user(), null)->findOrFail($k->IdComision);
+        $c = $this->svc->visibles($this->actor($r), null)->findOrFail($k->IdComision);
 
         return [$c, $k];
     }

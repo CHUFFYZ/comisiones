@@ -50,6 +50,17 @@
                 </a>
             </li>
 
+            @if ($puedeGestion)
+                <li class="nav-item mb-1">
+                    <a href="{{ route('admin.usuarios.index') }}" class="nav-link {{ request()->routeIs('admin.usuarios.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-users w-20px"></i><span>Usuarios</span></a>
+                </li>
+                <li class="nav-item mb-1">
+                    <a href="{{ route('admin.permisos.index') }}" class="nav-link {{ request()->routeIs('admin.permisos.*') ? 'active' : '' }}">
+                        <i class="fa-solid fa-user-clock w-20px"></i><span>Permisos temporales</span></a>
+                </li>
+            @endif
+
             <li class="nav-item">
                 <button type="button" id="btnMisModulos"
                         class="nav-link w-100 border-0 bg-transparent text-start"

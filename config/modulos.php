@@ -15,6 +15,15 @@ return [
     // Clave del módulo que da acceso total
     'modulo_global' => 'MGSU',
 
+    'creables' => [
+        'Administrador'       => ['SecretariaAcademica', 'Secretaria', 'Director', 'Profesor'],
+        'SecretariaAcademica' => ['Secretaria'],
+    ],
+    'asignables' => [
+        'Administrador'       => ['MSC', 'MA'],
+        'SecretariaAcademica' => ['MSC'],
+    ],
+
     // Opciones por módulo. 'accion' = permiso mínimo requerido
     // (Constancias ya no es opción: se gestiona dentro de cada comisión)
     'opciones' => [

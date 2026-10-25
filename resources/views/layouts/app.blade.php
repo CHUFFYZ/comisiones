@@ -31,6 +31,7 @@
 
     <!-- Tema Propio -->
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cati-extra.css') }}">
 
     @stack('styles')
 </head>
@@ -44,6 +45,7 @@
     <!-- Header + contenido + footer, a un costado del menú -->
     <div class="app-shell d-flex flex-column min-vh-100">
         @include('components.header')
+        @auth @include('components.simular') @endauth
 
         <main class="flex-grow-1 p-3 p-md-4 d-flex flex-column">
             @yield('content')

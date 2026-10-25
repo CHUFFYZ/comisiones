@@ -1,12 +1,16 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Admin\PermisoController;
+use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ComisionController;
 use App\Http\Controllers\ConstanciaController;
 use App\Http\Controllers\ModuloController;
 use App\Http\Controllers\NotificacionController;
+use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\ProfesorController;
+use App\Http\Controllers\SimulacionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('publico.inicio'))->name('inicio');
@@ -19,6 +23,27 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/perfil', [PerfilController::class, 'index'])->name('perfil');
+    Route::post('/perfil/foto', [PerfilController::class, 'foto'])->name('perfil.foto');
+    Route::delete('/perfil/foto', [PerfilController::class, 'quitarFoto'])->name('perfil.foto.quitar');
+
+    Route::post('/simulacion', [SimulacionController::class, 'iniciar'])->name('simulacion.iniciar');
+    Route::delete('/simulacion', [SimulacionController::class, 'terminar'])->name('simulacion.terminar');
+
+    Route::middleware('gestion.usuarios')->prefix('administracion')->name('admin.')->where(['id' => '[0-9]+'])->group(function () {
+        Route::get('usuarios',                 [UsuarioController::class, 'index'])->name('usuarios.index');
+        Route::get('usuarios/crear',           [UsuarioController::class, 'create'])->name('usuarios.create');
+        Route::post('usuarios',                [UsuarioController::class, 'store'])->name('usuarios.store');
+        Route::get('usuarios/bajas',           [UsuarioController::class, 'bajas'])->name('usuarios.bajas');
+        Route::get('usuarios/{id}/editar',     [UsuarioController::class, 'edit'])->name('usuarios.edit');
+        Route::put('usuarios/{id}',            [UsuarioController::class, 'update'])->name('usuarios.update');
+        Route::delete('usuarios/{id}',         [UsuarioController::class, 'baja'])->name('usuarios.baja');
+        Route::patch('usuarios/{id}/restaurar',[UsuarioController::class, 'restaurar'])->name('usuarios.restaurar');
+        Route::get('permisos',                 [PermisoController::class, 'index'])->name('permisos.index');
+        Route::post('permisos/{id}',           [PermisoController::class, 'store'])->name('permisos.store');
+        Route::delete('permisos/{id}',         [PermisoController::class, 'destroy'])->name('permisos.destroy');
+    });
+
     Route::get('/modulos', [ModuloController::class, 'index'])->name('modulos.index');
     Route::get('/modulos/{modulo}', [ModuloController::class, 'show'])
         ->middleware('modulo.acceso:leer')
@@ -73,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('chat')->name('chat.')->group(function () {
         Route::get('/',                          [ChatController::class, 'index'])->name('index');
         Route::get('/usuarios',                  [ChatController::class, 'usuarios'])->name('usuarios');
+        Route::get('/perfil/{id}',               [ChatController::class, 'perfil'])->whereNumber('id')->name('perfil');
         Route::get('/conversaciones',            [ChatController::class, 'conversaciones'])->name('conversaciones');
         Route::post('/conversaciones',           [ChatController::class, 'abrir'])->name('abrir');
         Route::get('/supervision',               [ChatController::class, 'supervision'])->name('supervision');

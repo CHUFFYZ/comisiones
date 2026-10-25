@@ -20,7 +20,7 @@ class ComisionController extends Controller
 
     private function listar(Request $r, bool $anuladas)
     {
-        $u = $r->user();
+        $u = $this->actor($r);
 
         $q = $this->svc->visibles($u, $anuladas)
             ->when($r->filled('q'), fn ($q) => $q->where(fn ($w) => $w
@@ -58,7 +58,7 @@ class ComisionController extends Controller
 
     private function formulario(Request $r, ?Comision $c)
     {
-        $u = $r->user();
+        $u = $this->actor($r);
 
         return view('comisiones.form', [
             'comision'   => $c,
@@ -70,7 +70,7 @@ class ComisionController extends Controller
 
     public function store(Request $r)
     {
-        $c = $this->svc->crear($r->user(), $this->validar($r));
+        $c = $this->svc->crear($this->actor($r), $this->validar($r));
 
         return redirect()->route('comisiones.show', $c->Id)->with('ok', "Comisión creada: {$c->NOficio}");
     }
@@ -78,7 +78,7 @@ class ComisionController extends Controller
     public function update(Request $r, int $id)
     {
         $c = $this->buscar($r, $id, false);
-        $c = $this->svc->actualizar($r->user(), $c, $this->validar($r, true));
+        $c = $this->svc->actualizar($this->actor($r), $c, $this->validar($r, true));
 
         return redirect()->route('comisiones.show', $c->Id)->with('ok', 'Comisión actualizada.');
     }
@@ -88,24 +88,20 @@ class ComisionController extends Controller
     {
         $existente = $r->filled('_id') ? $this->buscar($r, (int) $r->_id, false) : null;
 
-        return response($this->svc->previa($r->user(), $r->all(), $existente));
+        return response($this->svc->previa($this->actor($r), $r->all(), $existente));
     }
 
     private function validar(Request $r, bool $edicion = false): array
     {
-        $u = $r->user();
-
-        $fechaInicio = ['required', 'date'];
-        if (!$edicion) {
-            $fechaInicio[] = 'after_or_equal:today';
-        }
+        $u = $this->actor($r);
 
         return $r->validate([
             'IdTipoComision' => ['required', Rule::in($this->svc->tiposPermitidos($u)->pluck('Id'))],
             'IdPlantilla'    => ['required', Rule::exists('plantilla_documento', 'Id')->where('TipoDocumento', 'Comision')->where('Activo', 1)],
             'Asunto'         => ['required', 'string', 'min:5', 'max:255'],
             'Contexto'       => ['required', 'string', 'min:10', 'max:1000'],
-            'FechaInicio'    => $fechaInicio,
+            'Cierre'         => ['nullable', 'string', 'max:1000'],
+            'FechaInicio'    => ['required', 'date'],
             'FechaFin'       => ['nullable', 'date', 'after_or_equal:FechaInicio'],
             'profesores'     => ['required', 'array', 'min:1'],
             'profesores.*'   => [Rule::in($this->svc->profesores($u)->pluck('Id'))],
@@ -114,7 +110,6 @@ class ComisionController extends Controller
             'Asunto.min'                 => 'El asunto debe tener al menos 5 caracteres.',
             'Contexto.required'          => 'Describe en qué consiste la comisión (contexto).',
             'Contexto.min'               => 'El contexto debe tener al menos 10 caracteres.',
-            'FechaInicio.after_or_equal' => 'La fecha de inicio no puede ser anterior a hoy.',
             'FechaFin.after_or_equal'    => 'La fecha final no puede ser anterior a la inicial.',
             'profesores.required'        => 'Selecciona al menos un profesor.',
             'profesores.*.in'            => 'Hay un profesor que no pertenece a tu facultad.',
@@ -125,14 +120,14 @@ class ComisionController extends Controller
 
     public function avanzar(Request $r, int $id)
     {
-        $this->svc->avanzar($r->user(), $this->buscar($r, $id, false));
+        $this->svc->avanzar($this->actor($r), $this->buscar($r, $id, false));
 
         return back()->with('ok', 'Estado actualizado.');
     }
 
     public function retroceder(Request $r, int $id)
     {
-        $this->svc->retroceder($r->user(), $this->buscar($r, $id, false));
+        $this->svc->retroceder($this->actor($r), $this->buscar($r, $id, false));
 
         return back()->with('ok', 'Se regresó al estado anterior.');
     }
@@ -143,14 +138,14 @@ class ComisionController extends Controller
             'Motivo.required' => 'Escribe qué debe corregir el profesor.',
             'Motivo.min'      => 'La descripción debe tener al menos 5 caracteres.',
         ]);
-        $this->svc->rechazarReporte($r->user(), $this->buscar($r, $id, false), $data['Motivo']);
+        $this->svc->rechazarReporte($this->actor($r), $this->buscar($r, $id, false), $data['Motivo']);
 
         return back()->with('ok', 'Reporte rechazado; se avisó a los profesores.');
     }
 
     public function anular(Request $r, int $id)
     {
-        $this->svc->anular($r->user(), $this->buscar($r, $id, false));
+        $this->svc->anular($this->actor($r), $this->buscar($r, $id, false));
 
         return redirect()->route('comisiones.index')->with('ok', 'Comisión anulada.');
     }
@@ -158,8 +153,8 @@ class ComisionController extends Controller
     /** Deshace una anulación. */
     public function restaurar(Request $r, int $id)
     {
-        $c = $this->svc->visibles($r->user(), true)->findOrFail($id);
-        $this->svc->restaurar($r->user(), $c);
+        $c = $this->svc->visibles($this->actor($r), true)->findOrFail($id);
+        $this->svc->restaurar($this->actor($r), $c);
 
         return back()->with('ok', 'Anulación revertida.');
     }
@@ -184,6 +179,6 @@ class ComisionController extends Controller
     /** $anuladas: false = solo vigentes (para modificar), null = ambas (para consultar) */
     private function buscar(Request $r, int $id, ?bool $anuladas = null): Comision
     {
-        return $this->svc->visibles($r->user(), $anuladas)->findOrFail($id);
+        return $this->svc->visibles($this->actor($r), $anuladas)->findOrFail($id);
     }
 }

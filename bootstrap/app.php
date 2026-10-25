@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\ActualizarConexion;
+use App\Http\Middleware\GestionUsuarios;
 use App\Http\Middleware\VerificarAccesoModulo;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,8 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'modulo.acceso' => VerificarAccesoModulo::class,
+            'modulo.acceso'    => VerificarAccesoModulo::class,
+            'gestion.usuarios' => GestionUsuarios::class,
         ]);
+        $middleware->appendToGroup('web', ActualizarConexion::class);
         $middleware->redirectUsersTo(fn () => auth()->user()?->Rol === 'Profesor'
             ? route('profesor.panel')
             : route('modulos.index'));

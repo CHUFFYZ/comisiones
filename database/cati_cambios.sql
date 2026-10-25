@@ -30,10 +30,10 @@ ALTER TABLE `constancia`
   ADD COLUMN `Contexto`      text        NULL         AFTER `IdPlantilla`,
   ADD COLUMN `DirectorCargo` varchar(50) DEFAULT NULL AFTER `DirectorNombre`;
 
--- 5) Plantilla: el contexto sale de la plantilla; las fechas pasan a ser dinámicas ({fechas})
+-- 5) Plantilla: el contexto sale de la plantilla; las fechas se agregan al final del cierre desde el código
 ALTER TABLE `plantilla_documento` DROP COLUMN `Contexto`;
 UPDATE `plantilla_documento`
-   SET `Cierre` = ', con el propósito de fortalecer las competencias de los estudiantes próximos a egresar y contribuir a la mejora de los indicadores académicos de nuestra Facultad. Esta actividad se llevará a cabo {fechas}.'
+   SET `Cierre` = ', con el propósito de fortalecer las competencias de los estudiantes próximos a egresar y contribuir a la mejora de los indicadores académicos de nuestra Facultad.'
  WHERE `Id` = 1;
 
 -- 6) Bitácora de estados (guarda la descripción de rechazos/refutaciones)

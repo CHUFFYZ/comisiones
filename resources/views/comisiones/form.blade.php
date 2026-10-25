@@ -45,7 +45,7 @@
                         <label class="form-label" for="IdPlantilla">Plantilla <span class="text-danger">*</span></label>
                         <select id="IdPlantilla" name="IdPlantilla" class="form-select" required>
                             @foreach ($plantillas as $p)
-                                <option value="{{ $p->Id }}" @selected(old('IdPlantilla', $comision->IdPlantilla ?? null) == $p->Id)>Plantilla #{{ $p->Id }} · {{ $p->Facultad }}</option>
+                                <option value="{{ $p->Id }}" data-cierre="{{ $p->Cierre }}" @selected(old('IdPlantilla', $comision->IdPlantilla ?? null) == $p->Id)>Plantilla #{{ $p->Id }} · {{ $p->Facultad }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -59,10 +59,14 @@
                                   placeholder="Completa la frase: «…ha sido comisionado para [contexto]»">{{ old('Contexto', $comision->Contexto ?? '') }}</textarea>
                         <div class="form-text">Se propone según el tipo, pero puedes escribir el tuyo (en minúscula inicial, sin punto final).</div>
                     </div>
+                    <div class="col-12">
+                        <label class="form-label" for="Cierre">Cierre</label>
+                        <textarea id="Cierre" name="Cierre" rows="3" maxlength="1000" class="form-control">{{ old('Cierre', $comision->Cierre ?? '') }}</textarea>
+                        <div class="form-text">La fecha se agrega automáticamente al final del cierre según las fechas de la comisión.</div>
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label" for="FechaInicio">Fecha de inicio <span class="text-danger">*</span></label>
                         <input type="date" id="FechaInicio" name="FechaInicio" class="form-control" required
-                               @unless ($edit) min="{{ now()->toDateString() }}" @endunless
                                value="{{ old('FechaInicio', $comision?->FechaInicio?->format('Y-m-d')) }}">
                     </div>
                     <div class="col-md-6">
@@ -156,6 +160,14 @@
     const programar = () => { clearTimeout(temporizador); temporizador = setTimeout(actualizarPrevia, 450); };
     form.addEventListener('input', programar);
     form.addEventListener('change', programar);
+    const plant = document.getElementById('IdPlantilla'), cie = document.getElementById('Cierre');
+    let cierreSug = '';
+    function sugerirCierre() {
+        const c = plant.selectedOptions[0]?.dataset.cierre || '';
+        if (cie.value.trim() === '' || cie.value === cierreSug) { cie.value = c; cierreSug = c; }
+    }
+    plant.addEventListener('change', sugerirCierre);
+    sugerirCierre();
     actualizarPrevia();
 </script>
 @endpush

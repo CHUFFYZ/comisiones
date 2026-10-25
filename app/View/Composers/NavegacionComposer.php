@@ -7,6 +7,7 @@ use App\Models\ChatMensaje;
 use App\Models\Facultad;
 use App\Models\Modulo;
 use App\Models\Notificacion;
+use App\Models\Usuario;
 use App\Services\AccesoService;
 use Illuminate\View\View;
 
@@ -39,9 +40,21 @@ class NavegacionComposer
             'notifNoLeidas'   => 0,
             'notifRecientes'  => collect(),
             'chatNoLeidos'    => 0,
+            'puedeSimular'    => false,
+            'simulado'        => null,
+            'secretariasSim'  => collect(),
+            'puedeGestion'    => false,
         ];
 
         if ($user) {
+            $data['puedeGestion'] = $this->acceso->puedeGestionarUsuarios($user);
+            if ($this->acceso->esSuperUsuario($user)) {
+                $data['puedeSimular']   = true;
+                $data['simulado']       = ($sid = session('simulando')) ? Usuario::with('facultad')->find($sid) : null;
+                $data['secretariasSim'] = Usuario::with('facultad')->where('Activo', 1)
+                    ->deRol(['Secretaria', 'SecretariaAcademica'])->orderBy('IdFacultad')->orderBy('Nombre')->get()
+                    ->groupBy(fn ($s) => $s->facultad->Clave ?? 'Sin facultad');
+            }
             $data['esProfesor']     = $user->Rol === 'Profesor' || $user->comisiones()->exists();
             $data['notifNoLeidas']  = Notificacion::where('IdUsuario', $user->Id)->whereNull('LeidaAt')->count();
             $data['notifRecientes'] = Notificacion::where('IdUsuario', $user->Id)->orderByDesc('Id')->limit(8)->get();

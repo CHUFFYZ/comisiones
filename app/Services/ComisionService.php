@@ -42,7 +42,7 @@ class ComisionService
 
     public function profesores(Usuario $u): Collection
     {
-        return Usuario::where('Rol', 'Profesor')->where('Activo', 1)
+        return Usuario::deRol('Profesor')->where('Activo', 1)
             ->where('IdFacultad', $u->IdFacultad)
             ->orderBy('Apellido')->orderBy('Nombre')->get();
     }
@@ -96,6 +96,7 @@ class ComisionService
                 'NOficio'        => $this->nuevoOficio($u->facultad->Clave),
                 'Asunto'         => $d['Asunto'],
                 'Contexto'       => $d['Contexto'],
+                'Cierre'         => $this->cierre($d),
                 'FechaEmision'   => now(),
                 'FechaInicio'    => $d['FechaInicio'],
                 'FechaFin'       => $d['FechaFin'] ?? null,
@@ -128,6 +129,7 @@ class ComisionService
                 'IdPlantilla'    => $d['IdPlantilla'],
                 'Asunto'         => $d['Asunto'],
                 'Contexto'       => $d['Contexto'],
+                'Cierre'         => $this->cierre($d),
                 'FechaInicio'    => $d['FechaInicio'],
                 'FechaFin'       => $d['FechaFin'] ?? null,
                 'UpdatedBy'      => $u->Matricula,
@@ -168,7 +170,8 @@ class ComisionService
         $c->fill([
             'Asunto'      => $in['Asunto'] ?? '',
             'Contexto'    => $in['Contexto'] ?? '',
-            'FechaInicio' => !empty($in['FechaInicio']) ? $in['FechaInicio'] : now()->toDateString(),
+            'Cierre'      => $in['Cierre'] ?? '',
+            'FechaInicio' => !empty($in['FechaInicio']) ? $in['FechaInicio'] : null,
             'FechaFin'    => !empty($in['FechaFin']) ? $in['FechaFin'] : null,
         ]);
 
@@ -291,6 +294,7 @@ class ComisionService
             'IdComision'       => $c->Id,
             'IdPlantilla'      => $plantilla->Id,
             'Contexto'         => $c->Contexto,
+            'Cierre'           => $plantilla->Cierre,
             'FechaElaboracion' => now(),
             ...$this->snapshots($u, $c->IdFacultad),
             'Activo'           => 1,
@@ -306,13 +310,18 @@ class ComisionService
         return $k;
     }
 
-    /** Modifica el contexto y reescribe el PDF guardado. Si estaba refutada, vuelve a Finalizado. */
-    public function actualizarConstancia(Usuario $u, Comision $c, string $contexto): Constancia
+    /** Modifica el texto y reescribe el PDF guardado. Si estaba refutada, vuelve a Finalizado. */
+    public function actualizarConstancia(Usuario $u, Comision $c, string $contexto, ?string $cierre = null): Constancia
     {
         $k = $c->constancia;
         abort_unless($k, 404, 'La comisión no tiene constancia.');
 
-        $k->update(['Contexto' => $contexto, 'FechaElaboracion' => now(), 'UpdatedBy' => $u->Matricula]);
+        $k->update([
+            'Contexto' => $contexto,
+            'Cierre'   => ($cierre !== null && trim($cierre) !== '') ? $cierre : $k->Cierre,
+            'FechaElaboracion' => now(),
+            'UpdatedBy' => $u->Matricula,
+        ]);
         $c->loadMissing('facultad');
         $this->docs->guardarConstancia($c, $k->fresh());
 
@@ -380,12 +389,20 @@ class ComisionService
         ];
     }
 
+    /** Cierre capturado; si viene vacío, el de la plantilla. */
+    private function cierre(array $d): string
+    {
+        return trim((string) ($d['Cierre'] ?? '')) !== ''
+            ? trim($d['Cierre'])
+            : (string) (PlantillaDocumento::find($d['IdPlantilla'])?->Cierre ?? '');
+    }
+
     /* ───────── internos ───────── */
 
     /** Snapshots inmutables: director vigente de la facultad + iniciales de quien elabora. */
     private function snapshots(Usuario $u, int $idFacultad, bool $estricto = true): array
     {
-        $dir = Usuario::where('Rol', 'Director')->where('IdFacultad', $idFacultad)->where('Activo', 1)->first();
+        $dir = Usuario::deRol('Director')->where('IdFacultad', $idFacultad)->where('Activo', 1)->first();
 
         if (!$dir && $estricto) {
             throw ValidationException::withMessages(['general' => 'No hay un Director activo registrado en la facultad.']);

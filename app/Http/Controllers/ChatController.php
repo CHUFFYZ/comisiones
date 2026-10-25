@@ -21,25 +21,43 @@ class ChatController extends Controller
 
     public function index(Request $r)
     {
-        return view('chat.index', ['esSU' => $this->esSU($r->user())]);
+        return view('chat.index', ['esSU' => $this->esSU($r->user()), 'miFacultad' => $r->user()->IdFacultad]);
     }
 
-    /* ───────── directorio y conversaciones ───────── */
+    /* ───────── directorio, perfil y conversaciones ───────── */
 
+    /** Todos los usuarios activos; el cliente los agrupa por facultad y rol. */
     public function usuarios(Request $r): JsonResponse
     {
         $u = $r->user();
-        $q = trim((string) $r->q);
 
-        $users = Usuario::where('Activo', 1)->where('Id', '<>', $u->Id)
+        $users = Usuario::with('facultad')->where('Activo', 1)->where('Id', '<>', $u->Id)
             ->when(!$this->esSU($u), fn ($w) => $w->whereNotIn('Id', $this->superIds()))
-            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x
-                ->where('Nombre', 'like', "%$q%")->orWhere('Apellido', 'like', "%$q%")->orWhere('Matricula', 'like', "%$q%")))
-            ->orderBy('Nombre')->limit(30)->get();
+            ->orderBy('Nombre')->get();
 
         return response()->json($users->map(fn ($x) => [
-            'id' => $x->Id, 'nombre' => $x->nombre_corto, 'rol' => $x->Rol,
+            'id' => $x->Id, 'nombre' => $x->nombre_corto,
+            'rol' => $x->rol_nombre ?? '—', 'rolOrden' => $x->rolModelo?->Orden ?? 99,
+            'facultadId' => $x->IdFacultad, 'facultad' => $x->facultad?->Clave, 'facultadNombre' => $x->facultad?->Nombre,
+            'foto' => $x->foto_src,
         ])->values());
+    }
+
+    public function perfil(Request $r, int $id): JsonResponse
+    {
+        $x = Usuario::with('facultad')->where('Activo', 1)->findOrFail($id);
+        abort_if($this->esSU($x) && !$this->esSU($r->user()), 403, 'Usuario no disponible.');
+
+        return response()->json([
+            'nombreCompleto' => $x->nombre_con_grado,
+            'facultad'       => $x->facultad?->Nombre ?? '—',
+            'facultadClave'  => $x->facultad?->Clave,
+            'matricula'      => $x->Matricula,
+            'correo'         => $x->Correo,
+            'rol'            => $x->rol_nombre,
+            'genero'         => $x->genero_texto,
+            'foto'           => $x->foto_src,
+        ]);
     }
 
     public function conversaciones(Request $r): JsonResponse
@@ -77,10 +95,7 @@ class ChatController extends Controller
         $u = $r->user();
         $c = $this->propia($u, $id);
 
-        $q = ChatMensaje::where('IdConversacion', $c->Id);
-        $msgs = $r->filled('despues')
-            ? $q->where('Id', '>', (int) $r->despues)->orderBy('Id')->limit(200)->get()
-            : $q->orderByDesc('Id')->limit(200)->get()->reverse()->values();
+        $msgs = ChatMensaje::where('IdConversacion', $c->Id)->orderByDesc('Id')->limit(200)->get()->reverse()->values();
 
         ChatMensaje::where('IdConversacion', $c->Id)->where('IdRemitente', '<>', $u->Id)
             ->whereNull('LeidoAt')->update(['LeidoAt' => now()]);
@@ -89,8 +104,10 @@ class ChatController extends Controller
             'mensajes'       => $msgs->map(fn ($m) => [
                 'id' => $m->Id, 'mio' => (int) $m->IdRemitente === (int) $u->Id,
                 'texto' => $m->Mensaje, 'fecha' => $m->CreatedAt->format('d/m/y H:i'),
+                'leido' => $m->LeidoAt !== null,
             ])->values(),
             'puedeResponder' => $this->puedeEscribir($u, $c),
+            'contacto'       => $this->contacto($u, $c),
         ]);
     }
 
@@ -132,21 +149,44 @@ class ChatController extends Controller
 
         return response()->json([
             'mensajes' => $msgs->map(fn ($m) => [
-                'id' => $m->Id, 'mio' => false,
+                'id' => $m->Id, 'mio' => false, 'leido' => $m->LeidoAt !== null,
                 'autor' => $nombres[$m->IdRemitente]->nombre_corto ?? '—',
                 'texto' => $m->Mensaje, 'fecha' => $m->CreatedAt->format('d/m/y H:i'),
             ])->values(),
             'puedeResponder' => false,
+            'contacto'       => null,
         ]);
     }
 
     /* ───────── internos ───────── */
 
+    /** Datos del otro participante (rol, facultad, conexión). El superusuario que inició aparece anónimo. */
+    private function contacto(Usuario $u, ChatConversacion $c): array
+    {
+        $o = Usuario::with('facultad')->find($c->otro((int) $u->Id));
+        if (!$o) {
+            return ['id' => null, 'nombre' => '—', 'rol' => null, 'facultad' => null, 'foto' => null, 'enLinea' => false, 'conexion' => null, 'anonimo' => true];
+        }
+        if ($this->esSU($o) && !$this->esSU($u)) {
+            return ['id' => null, 'nombre' => 'Desconocido', 'rol' => null, 'facultad' => null, 'foto' => null, 'enLinea' => false, 'conexion' => null, 'anonimo' => true];
+        }
+
+        $uc = $o->UltimaConexion;
+
+        return [
+            'id' => $o->Id, 'nombre' => $o->nombre_corto, 'rol' => $o->rol_nombre,
+            'facultad' => $o->facultad?->Clave, 'foto' => $o->foto_src, 'anonimo' => false,
+            'enLinea'  => $uc ? $uc->gt(now()->subMinutes(2)) : false,
+            'conexion' => $uc?->format('d/m/y H:i'),
+        ];
+    }
+
     /** Lista para el panel izquierdo. $todas = vista de supervisión (nombres reales de ambos). */
     private function listar($convs, Usuario $u, bool $todas): array
     {
         $ids = $convs->pluck('Id');
-        $usuarios = Usuario::whereIn('Id', $convs->flatMap(fn ($c) => [$c->IdUsuario1, $c->IdUsuario2])->unique())
+        $usuarios = Usuario::with('facultad')
+            ->whereIn('Id', $convs->flatMap(fn ($c) => [$c->IdUsuario1, $c->IdUsuario2])->unique())
             ->get()->keyBy('Id');
 
         $noLeidos = $todas ? collect() : ChatMensaje::whereIn('IdConversacion', $ids)
@@ -159,20 +199,22 @@ class ChatController extends Controller
         $yoSU = $this->esSU($u);
 
         return $convs->map(function ($c) use ($u, $todas, $usuarios, $noLeidos, $ultimos, $yoSU) {
+            $rol = $fac = $foto = $uid = null;
+
             if ($todas) {
                 $titulo = ($usuarios[$c->IdUsuario1]->nombre_corto ?? '—') . ' ↔ ' . ($usuarios[$c->IdUsuario2]->nombre_corto ?? '—');
-                $rol = null;
             } else {
                 $otro = $usuarios[$c->otro($u->Id)] ?? null;
-                // El superusuario aparece como "Desconocido" para quien recibe su mensaje
                 $anonimo = $otro && !$yoSU && in_array((int) $otro->Id, $this->superIds(), true);
                 $titulo = $anonimo ? 'Desconocido' : ($otro->nombre_corto ?? '—');
-                $rol = $anonimo ? null : ($otro->Rol ?? null);
+                if ($otro && !$anonimo) {
+                    $uid = $otro->Id; $rol = $otro->rol_nombre; $fac = $otro->facultad?->Clave; $foto = $otro->foto_src;
+                }
             }
             $ult = $ultimos[$c->Id] ?? null;
 
             return [
-                'id' => $c->Id, 'titulo' => $titulo, 'rol' => $rol,
+                'id' => $c->Id, 'titulo' => $titulo, 'rol' => $rol, 'facultad' => $fac, 'foto' => $foto, 'userId' => $uid,
                 'ultimo' => $ult ? mb_substr($ult->Mensaje, 0, 60) : 'Sin mensajes',
                 'fecha' => $ult?->CreatedAt?->format('d/m H:i'),
                 'noLeidos' => (int) ($noLeidos[$c->Id] ?? 0),

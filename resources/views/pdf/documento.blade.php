@@ -8,13 +8,13 @@
 <meta charset="UTF-8">
 <style>
     @page { margin: 40px 70px 100px 70px; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 12px; line-height: 1.5; color: #000; display: flex; flex-direction: column; justify-content: between;}
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #000; display: flex; flex-direction: column; justify-content: between;}
     table { border-collapse: collapse; width: 100%; }
     .hdr td { vertical-align: middle; }
     .hdr .logo { width: 90px; }
     .hdr .tit { text-align: center; font-weight: bold; }
-    .hdr .uni { font-size: 14px; }
-    .hdr .fac { font-size: 12px; }
+    .hdr .uni { font-size: 16px; }
+    .hdr .fac { font-size: 14px; }
     .meta { text-align: right; margin-top: 30px; }
     .dest { margin-top: 25px; }
     .just { text-align: justify; margin: 14px 0; }
@@ -24,8 +24,8 @@
     .linea { border-top: 1px solid #000; width: 230px; margin-bottom: 4px; }
     .sello img { height: 120px; }
     .footer { position: fixed; bottom: -70px; left: 0; right: 0; }
-    .ccp { font-size: 9px; margin-bottom: 6px; }
-    .addr { border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 9px; }
+    .ccp { font-size: 10px; margin-bottom: 6px; }
+    .addr { border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 10px; }
     @if ($web)
     /* Vista en pantalla (detalle / vista previa): hoja carta con márgenes y pie al final */
     body { padding: 36px 56px; background: #fff; }
@@ -42,13 +42,13 @@
             <div class="uni">{{ $p->NombreUniversidad }}</div>
             <div class="fac">{{ $p->Facultad }}</div>
         </td>
-        <td class="logo" align="right">@if ($logoDer)<img src="{{ $logoDer }}" width="80">@endif</td>
+        <td class="logo" align="right">@if ($logoDer)<img src="{{ $logoDer }}" width="100">@endif</td>
     </tr>
 </table>
 
 <div class="meta">
     {{ $p->Lugar }}, a {{ $fechaDoc }}.<br>
-    <strong>Oficio no.:</strong> {{ $c->NOficio }}<br>
+    <strong>Oficio no.</strong> {{ $c->NOficio }}<br>
     <strong>Asunto:</strong> {{ $asunto }}
 </div>
 
@@ -66,7 +66,7 @@
     <p style="margin-top:14px;">{{ $saludo }}</p>
 @endunless
 
-<p class="just">{{ $cuerpo }}</p>
+<p class="just"><span class="documento-introduccion">{{ $introduccion }}</span> <strong><span class="documento-contexto">{{ $contexto }}</span></strong>{{ $separadorCierre }}<span class="documento-cierre">{{ $cierre }}</span></p>
 <p class="just">{{ $p->Despedida }}</p>
 
 <div class="firmas">
@@ -74,11 +74,14 @@
         <tr>
             <td style="width:60%; vertical-align:bottom;">
                 <div><strong>Atentamente,</strong></div>
-                <div><strong><em>Por la Grandeza de México</em></strong></div>
-                <div class="firma-box" style="rotate: {{ $rotacionAleatoriaFirma }}deg; transform-origin: left;">@if ($firma)<img src="{{ $firma }}">@endif</div>
+                <div><strong><em>"Por la Grandeza de México"</em></strong></div>
+                <div class="firma-box" style="rotate: {{ $rotacionAleatoriaFirma }}deg; transform-origin: left; margin-left: 20px;">@if ($firma)<img src="{{ $firma }}">@endif</div>
                 <div class="linea"></div>
                 <div><strong>{{ $doc->DirectorNombre }}</strong></div>
                 <div><strong>{{ $doc->DirectorCargo ?: 'Director' }} de la {{ $facTitulo }}</strong></div>
+                @if ($correoDirector)
+                    <strong><div>{{ $correoDirector }}</div></strong>
+                @endif
             </td>
             <td class="sello" style="vertical-align:bottom; text-align:center; rotate: {{ $rotacionAleatoriaSello }}deg; transform-origin: center;">
                 @if ($sello)<img src="{{ $sello }}">@endif

@@ -72,9 +72,11 @@
                 {{-- auto-close="outside": el menú no se cierra al abrir/cerrar "Mis módulos" --}}
                 <button class="btn btn-logout btn-sm d-flex align-items-center gap-2" type="button"
                         data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-                    <div class="usu-avatar usu-avatar--sec">
-                        {{ strtoupper(substr(auth()->user()->Nombre ?? 'U', 0, 1)) }}
-                    </div>
+                    @if (auth()->user()->foto_src)
+                        <img src="{{ auth()->user()->foto_src }}" alt="" class="usu-avatar">
+                    @else
+                        <div class="usu-avatar usu-avatar--sec">{{ strtoupper(substr(auth()->user()->Nombre ?? 'U', 0, 1)) }}</div>
+                    @endif
                     <div class="d-none d-sm-block lh-1 text-start">
                         <div class="fw-semibold small">{{ auth()->user()->nombre_corto }}</div>
                         <small class="text-white-50 text-xs">{{ auth()->user()->Matricula }}</small>
@@ -85,7 +87,7 @@
                 <ul class="dropdown-menu dropdown-menu-end shadow border-0 menu-usuario">
                     <li class="px-3 py-2">
                         <div class="fw-semibold small">{{ auth()->user()->nombre_corto }}</div>
-                        <small class="text-body-secondary">{{ auth()->user()->Rol }}</small>
+                        <small class="text-body-secondary">{{ auth()->user()->rol_nombre }}</small>
                     </li>
                     <li><hr class="dropdown-divider"></li>
 
@@ -94,6 +96,11 @@
                             <i class="fa-solid fa-house w-20px"></i> Panel principal
                         </a>
                     </li>
+                    <li><a class="dropdown-item small" href="{{ route('perfil') }}"><i class="fa-solid fa-id-card w-20px"></i> Mi perfil</a></li>
+                    @if ($puedeSimular)
+                        <li><button type="button" class="dropdown-item small" data-bs-toggle="modal" data-bs-target="#modalSimular">
+                            <i class="fa-solid fa-user-secret w-20px"></i> Simular secretaria</button></li>
+                    @endif
                     @if ($esProfesor)
                         <li>
                             <a class="dropdown-item small" href="{{ route('profesor.panel') }}">

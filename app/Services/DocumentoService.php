@@ -29,7 +29,18 @@ class DocumentoService
         $contexto = trim((string) $doc->Contexto) !== ''
             ? trim((string) $doc->Contexto)
             : $this->minuscula((string) $c->tipo?->Descripcion);
-        $cierre = str_replace('{fechas}', $this->fechas($c), (string) $p->Cierre);
+        $cierreTxt = trim((string) $doc->Cierre) !== '' ? (string) $doc->Cierre : (string) $p->Cierre;
+        $cierre = preg_replace('/\s*esta actividad se llevará a cabo\s*\{fechas\}\.?/iu', '', $cierreTxt);
+        $cierre = trim(str_replace('{fechas}', '', $cierre));
+        $fraseFechas = $this->fraseFechas($c, $esC);
+        if ($fraseFechas !== '') {
+            $cierre = trim($cierre) . ($cierre !== '' ? ' ' : '') . $fraseFechas;
+        }
+        $separadorCierre = $cierre !== '' && !preg_match('/^[,.;:]/u', $cierre) ? ' ' : '';
+        $correoDirector = Usuario::deRol('Director')
+            ->where('IdFacultad', $c->IdFacultad)
+            ->where('Activo', 1)
+            ->value('Correo');
 
         $saludo = $profes->count() > 1
             ? 'Estimados maestros,'
@@ -47,7 +58,11 @@ class DocumentoService
             'asunto'       => $esC ? 'Constancia de cumplimiento' : $c->Asunto,
             'profesores'   => $profes->map(fn ($x) => $this->nombreConGrado($x)),
             'saludo'       => $saludo,
-            'cuerpo'       => trim((string) $p->Introduccion) . ' ' . $contexto . $cierre,
+            'introduccion' => trim((string) $p->Introduccion),
+            'contexto'     => $contexto,
+            'cierre'       => $cierre,
+            'separadorCierre' => $separadorCierre,
+            'correoDirector' => $correoDirector,
             'facTitulo'    => $this->titulo((string) $p->Facultad),
             'logoIzq'      => $this->img($p->LogoIzquierdo, $web),
             'logoDer'      => $this->img($p->LogoDerecho, $web),
@@ -157,16 +172,17 @@ class DocumentoService
         return preg_replace('/\s+/', ' ', trim("$g {$u->Nombre} {$u->Apellido}"));
     }
 
-    private function fechas(Comision $c): string
+    private function fraseFechas(Comision $c, bool $esConstancia = false): string
     {
+        if (!$c->FechaInicio) return '';
         $i = $c->FechaInicio->copy()->locale('es');
         $f = $c->FechaFin?->copy()->locale('es');
+        $verbo = $esConstancia ? 'Se llevó a cabo' : 'Se llevará a cabo';
 
-        if (!$f || $f->isSameDay($i))              return 'el ' . $i->translatedFormat(self::FMT);
-        if ($i->format('Ym') === $f->format('Ym')) return 'del ' . $i->day . ' al ' . $f->translatedFormat(self::FMT);
-        if ($i->year === $f->year)                 return 'del ' . $i->translatedFormat('j \d\e F') . ' al ' . $f->translatedFormat(self::FMT);
+        if (!$f) return $verbo . ' el ' . $i->translatedFormat(self::FMT) . '.';
 
-        return 'del ' . $i->translatedFormat(self::FMT) . ' al ' . $f->translatedFormat(self::FMT);
+        return $verbo . ' desde ' . $i->translatedFormat(self::FMT)
+            . ' hasta ' . $f->translatedFormat(self::FMT) . '.';
     }
 
     private function minuscula(string $t): string

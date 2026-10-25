@@ -81,6 +81,7 @@
                     <dt class="col-sm-3 text-body-secondary">Asunto</dt><dd class="col-sm-9">{{ $c->Asunto }}</dd>
                     <dt class="col-sm-3 text-body-secondary">Tipo</dt><dd class="col-sm-9">{{ $c->tipo->Nombre }}</dd>
                     <dt class="col-sm-3 text-body-secondary">Contexto</dt><dd class="col-sm-9">{{ $c->Contexto ?: '—' }}</dd>
+                    <dt class="col-sm-3 text-body-secondary">Cierre</dt><dd class="col-sm-9">{{ $c->Cierre ?: '—' }}</dd>
                     <dt class="col-sm-3 text-body-secondary">Fechas</dt>
                     <dd class="col-sm-9">{{ $c->FechaInicio->format('d/m/y') }}@if ($c->FechaFin) – {{ $c->FechaFin->format('d/m/y') }}@endif</dd>
                     <dt class="col-sm-3 text-body-secondary">Profesores</dt>
@@ -234,6 +235,8 @@
             <div class="modal-body">
                 <label class="form-label" for="ContextoConst">Contexto de la constancia <span class="text-danger">*</span></label>
                 <textarea id="ContextoConst" name="Contexto" rows="4" maxlength="1000" class="form-control" required>{{ $c->constancia->Contexto }}</textarea>
+                <label class="form-label mt-3" for="CierreConst">Cierre de la constancia</label>
+                <textarea id="CierreConst" name="Cierre" rows="3" maxlength="1000" class="form-control">{{ $c->constancia->Cierre }}</textarea>
                 <div class="form-text">Se reescribe el PDF guardado{{ $c->IdEstado == 5 ? ' y la comisión vuelve a Finalizada' : '' }}.</div>
             </div>
             <div class="modal-footer">
@@ -246,7 +249,7 @@
 @endif
 @endpuede
 
-@if ($errors->has('Motivo') || $errors->has('Contexto'))
+@if ($errors->has('Motivo') || $errors->has('Contexto') || $errors->has('Cierre'))
 @push('scripts')
 <script>showToast(@json($errors->first()), 'error');</script>
 @endpush

@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\NivelAcceso;
 use App\Models\Modulo;
+use App\Models\Rol;
 use App\Models\Usuario;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 
@@ -85,6 +88,36 @@ class AccesoService
                 return $o;
             })
             ->values();
+    }
+
+    public function puedeGestionarUsuarios(?Usuario $u): bool
+    {
+        return $u && ($this->esSuperUsuario($u) || in_array($u->Rol, ['Administrador', 'SecretariaAcademica'], true));
+    }
+
+    public function rolesCreables(Usuario $u): array
+    {
+        return $this->esSuperUsuario($u)
+            ? Rol::where('Activo', 1)->pluck('Clave')->all()
+            : config('modulos.creables.' . $u->Rol, []);
+    }
+
+    /** SU: todos · Admin: su facultad · Sec. Académica: sus secretarias (de su facultad). */
+    public function usuariosGestionables(Usuario $u): Builder
+    {
+        $q = Usuario::query();
+        if (!$this->esSuperUsuario($u)) {
+            $q->where('IdFacultad', $u->IdFacultad)->deRol($this->rolesCreables($u));
+        }
+        return $q;
+    }
+
+    public function nivelesAsignables(Usuario $u): Collection
+    {
+        $n = NivelAcceso::with('modulo')->where('Activo', 1)->get();
+        if ($this->esSuperUsuario($u)) return $n;
+        $mods = config('modulos.asignables.' . $u->Rol, []);
+        return $n->filter(fn ($x) => in_array($x->modulo?->Clave, $mods, true))->values();
     }
 
     /* ───────── internos ───────── */

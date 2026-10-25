@@ -29,7 +29,7 @@ class ModuloController extends Controller
             'permiso'  => $this->acceso->letrasEn($user, $modulo->Clave),
             'opciones' => $this->acceso->opcionesDe($user, $modulo->Clave),
             // Tablero de comisiones solo para SisComisiones; el resto conserva sus accesos
-            'stats'    => $modulo->Clave === 'MSC' ? $this->comisiones->estadisticas($user) : null,
+            'stats'    => $modulo->Clave === 'MSC' ? $this->comisiones->estadisticas($this->actor($request)) : null,
         ]);
     }
 }
