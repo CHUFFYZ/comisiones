@@ -1,6 +1,6 @@
 @php
     $rotacionAleatoriaSello = rand(-45, 45); 
-    $rotacionAleatoriaFirma = rand(-10, 10); 
+    $rotacionAleatoriaFirma = rand(-15, 15); 
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -75,7 +75,7 @@
             <td style="width:60%; vertical-align:bottom;">
                 <div><strong>Atentamente,</strong></div>
                 <div><strong><em>"Por la Grandeza de México"</em></strong></div>
-                <div class="firma-box" style="rotate: {{ $rotacionAleatoriaFirma }}deg; transform-origin: left; margin-left: 20px;">@if ($firma)<img src="{{ $firma }}">@endif</div>
+                <div class="firma-box" >@if ($firma)<img src="{{ $firma }}" style="rotate: {{ $rotacionAleatoriaFirma }}deg; transform-origin: center; margin-left: 20px;">@endif</div>
                 <div class="linea"></div>
                 <div><strong>{{ $doc->DirectorNombre }}</strong></div>
                 <div><strong>{{ $doc->DirectorCargo ?: 'Director' }} de la {{ $facTitulo }}</strong></div>

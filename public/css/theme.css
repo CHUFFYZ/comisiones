@@ -254,7 +254,7 @@ html.menu-open .menu-fondo { display: block; }
 }
 .form-control, .form-select {
     background-color: var(--superficie-1); border: 1.5px solid var(--bs-border-color);
-    border-radius: 10px; font-size: .84rem; padding: .7rem .9rem; color: var(--azul);
+    border-radius: 10px; font-size: .84rem; /*padding: .7rem .9rem; */color: var(--azul);
 }
 .form-control:focus, .form-select:focus {
     background-color: #fff; border-color: var(--naranja); box-shadow: 0 0 0 3px rgba(255, 126, 95, .1);
