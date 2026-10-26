@@ -19,7 +19,11 @@ class PermisoController extends Controller
         $u = $r->user();
 
         $usuarios = $this->acc->usuariosGestionables($u)->where('Activo', 1)->where('Id', '<>', $u->Id)
-            ->with(['facultad', 'asignaciones.nivelTemp.modulo', 'asignaciones.tipoTemp'])
+            ->with([
+                'facultad',
+                'asignaciones.nivel.modulo', 'asignaciones.tipo',
+                'asignaciones.nivelTemp.modulo', 'asignaciones.tipoTemp',
+            ])
             ->orderBy('IdFacultad')->orderBy('Nombre')->paginate(20);
 
         return view('admin.permisos.index', [
@@ -71,5 +75,80 @@ class PermisoController extends Controller
         ]);
 
         return back()->with('ok', 'Permiso temporal retirado.');
+    }
+
+    public function storePermanente(Request $r, int $id)
+    {
+        $u = $r->user();
+        $x = $this->acc->usuariosGestionables($u)->where('Id', '<>', $u->Id)->findOrFail($id);
+        $niveles = $this->acc->nivelesAsignables($u);
+
+        $d = $r->validate([
+            'IdNivelAcceso' => ['required', Rule::in($niveles->pluck('Id')->all())],
+            'IdTipoPermiso' => ['required', Rule::in(TipoPermiso::where('Activo', 1)->pluck('Id')->all())],
+        ], [
+            'IdNivelAcceso.in' => 'No puedes asignar ese nivel de acceso.',
+            'IdTipoPermiso.in' => 'Selecciona un tipo de permiso activo.',
+        ]);
+
+        $nivel = $niveles->firstWhere('Id', (int) $d['IdNivelAcceso']);
+        $fila = AsignacionPermiso::where('IdUsuario', $x->Id)
+            ->where('IdNivelAcceso', $nivel->Id)
+            ->whereNull('DeletedAt')
+            ->first();
+
+        $valores = [
+            'IdNivelAcceso' => $nivel->Id,
+            'IdTipoPermiso' => $d['IdTipoPermiso'],
+            'Activo' => 1,
+            'UpdatedAt' => now(),
+            'UpdatedBy' => $u->Matricula,
+        ];
+
+        if ($fila) {
+            $fila->update($valores);
+        } else {
+            AsignacionPermiso::create($valores + [
+                'IdUsuario' => $x->Id,
+                'Clave' => 'AP' . $x->Matricula . '-' . $nivel->Id,
+                'Descripcion' => "Permiso permanente de {$x->Matricula}",
+                'CreatedAt' => now(),
+                'CreatedBy' => $u->Matricula,
+                'Versionn' => 1,
+            ]);
+        }
+
+        return back()->with('ok', "Permiso permanente asignado a {$x->nombre_corto}.");
+    }
+
+    public function destroyPermanente(Request $r, int $id, int $asignacion)
+    {
+        $u = $r->user();
+        $x = $this->acc->usuariosGestionables($u)->where('Id', '<>', $u->Id)->findOrFail($id);
+        $fila = AsignacionPermiso::where('IdUsuario', $x->Id)
+            ->whereNotNull('IdNivelAcceso')
+            ->whereNull('DeletedAt')
+            ->findOrFail($asignacion);
+
+        abort_unless(
+            $this->acc->nivelesAsignables($u)->contains('Id', (int) $fila->IdNivelAcceso),
+            403,
+            'No puedes retirar este nivel de acceso.'
+        );
+
+        $auditoria = ['UpdatedAt' => now(), 'UpdatedBy' => $u->Matricula];
+        if ($fila->IdTipoPermisoTemp || $fila->IdNivelAccesoTemp) {
+            $fila->update($auditoria + ['IdNivelAcceso' => null, 'IdTipoPermiso' => null]);
+        } else {
+            $fila->update($auditoria + [
+                'IdNivelAcceso' => null,
+                'IdTipoPermiso' => null,
+                'Activo' => 0,
+                'DeletedAt' => now(),
+                'DeletedBy' => $u->Matricula,
+            ]);
+        }
+
+        return back()->with('ok', "Permiso permanente retirado de {$x->nombre_corto}.");
     }
 }

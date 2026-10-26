@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['gestion.usuarios', 'modulo.acceso:leer,MA'])
         ->prefix('administracion')->name('admin.')->where(['id' => '[0-9]+'])->group(function () {
         Route::get('usuarios',                 [UsuarioController::class, 'index'])->name('usuarios.index');
+        Route::get('usuarios/{id}',             [UsuarioController::class, 'show'])->name('usuarios.show');
         Route::get('usuarios/crear',            [UsuarioController::class, 'create'])->middleware('modulo.acceso:crear,MA')->name('usuarios.create');
         Route::post('usuarios',                [UsuarioController::class, 'store'])->middleware('modulo.acceso:crear,MA')->name('usuarios.store');
         Route::get('usuarios/bajas',           [UsuarioController::class, 'bajas'])->middleware('modulo.acceso:eliminar,MA')->name('usuarios.bajas');
@@ -43,6 +44,33 @@ Route::middleware('auth')->group(function () {
         Route::get('permisos',                 [PermisoController::class, 'index'])->middleware('modulo.acceso:actualizar,MA')->name('permisos.index');
         Route::post('permisos/{id}',           [PermisoController::class, 'store'])->middleware('modulo.acceso:actualizar,MA')->name('permisos.store');
         Route::delete('permisos/{id}',         [PermisoController::class, 'destroy'])->middleware('modulo.acceso:eliminar,MA')->name('permisos.destroy');
+        Route::post('permisos/{id}/permanente', [PermisoController::class, 'storePermanente'])->middleware('modulo.acceso:actualizar,MA')->name('permisos.permanente.store');
+        Route::delete('permisos/{id}/permanente/{asignacion}', [PermisoController::class, 'destroyPermanente'])
+            ->whereNumber('asignacion')->middleware('modulo.acceso:eliminar,MA')->name('permisos.permanente.destroy');
+    });
+
+    Route::put('/perfil/password', [PerfilController::class, 'password'])->name('perfil.password');
+
+    /* ── Reportes imprimibles (MSC = comisiones · MA = usuarios) ── */
+    Route::prefix('reportes/{modulo}')->where(['modulo' => 'MSC|MA'])->name('reportes.')->group(function () {
+        Route::get('/',         [\App\Http\Controllers\ReporteController::class, 'index'])->middleware('modulo.acceso:leer')->name('index');
+        Route::get('/imprimir', [\App\Http\Controllers\ReporteController::class, 'imprimir'])->middleware('modulo.acceso:leer')->name('imprimir');
+    });
+
+    /* ── Profesores con sus comisiones (según alcance) ── */
+    Route::get('/modulos/MSC/profesores', [\App\Http\Controllers\DirectorioProfesoresController::class, 'index'])
+        ->middleware('modulo.acceso:leer,MSC')->name('directorio.profesores');
+
+    /* ── Plantillas de oficio ── */
+    Route::middleware(['gestion.usuarios', 'modulo.acceso:actualizar,MA'])
+        ->prefix('administracion')->name('admin.')->where(['id' => '[0-9]+'])->group(function () {
+        $p = \App\Http\Controllers\Admin\PlantillaController::class;
+        Route::get('plantillas',               [$p, 'index'])->name('plantillas.index');
+        Route::get('plantillas/crear',         [$p, 'create'])->name('plantillas.create');
+        Route::post('plantillas',              [$p, 'store'])->name('plantillas.store');
+        Route::get('plantillas/{id}/editar',   [$p, 'edit'])->name('plantillas.edit');
+        Route::put('plantillas/{id}',          [$p, 'update'])->name('plantillas.update');
+        Route::patch('plantillas/{id}/estado', [$p, 'estado'])->name('plantillas.estado');
     });
 
     Route::get('/modulos', [ModuloController::class, 'index'])->name('modulos.index');
@@ -97,6 +125,7 @@ Route::middleware('auth')->group(function () {
 
     /* ── Chat ── */
     Route::prefix('chat')->name('chat.')->group(function () {
+        Route::delete('/{id}', [ChatController::class, 'eliminar'])->whereNumber('id')->name('eliminar');
         Route::get('/',                          [ChatController::class, 'index'])->name('index');
         Route::get('/usuarios',                  [ChatController::class, 'usuarios'])->name('usuarios');
         Route::get('/perfil/{id}',               [ChatController::class, 'perfil'])->whereNumber('id')->name('perfil');

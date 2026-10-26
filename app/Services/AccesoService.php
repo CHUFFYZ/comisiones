@@ -31,6 +31,12 @@ class AccesoService
         );
     }
 
+    /** El administrador solo consulta comisiones (módulo MSC en modo lectura). */
+    public function soloConsulta(?Usuario $u): bool
+    {
+        return $u && $u->Rol === 'Administrador' && !$this->esSuperUsuario($u);
+    }
+
     /** Módulos reales (sin Global ni Principal) a los que el usuario tiene acceso. */
     public function modulosDe(?Usuario $u): Collection
     {
@@ -65,8 +71,13 @@ class AccesoService
         }
 
         $letras = $this->efectivos($u)->where('modulo', $idModulo)->pluck('letras')->implode('');
+        $res    = implode('', array_filter(str_split('CRUD'), fn ($l) => str_contains($letras, $l)));
 
-        return implode('', array_filter(str_split('CRUD'), fn ($l) => str_contains($letras, $l)));
+        if ($claveModulo === 'MSC' && $this->soloConsulta($u)) {
+            return str_contains($res, 'R') ? 'R' : '';
+        }
+
+        return $res;
     }
 
     /** $accion: leer | crear | actualizar | eliminar */
@@ -82,9 +93,10 @@ class AccesoService
     public function opcionesDe(?Usuario $u, string $claveModulo): Collection
     {
         return collect(config("modulos.opciones.$claveModulo", []))
+            ->filter(fn ($o) => !in_array($u?->Rol, $o['excluye'] ?? [], true))
             ->filter(fn ($o) => $this->puede($u, $claveModulo, $o['accion'] ?? 'leer'))
             ->map(function ($o) {
-                $o['url'] = (isset($o['ruta']) && Route::has($o['ruta'])) ? route($o['ruta']) : null;
+                $o['url'] = (isset($o['ruta']) && Route::has($o['ruta'])) ? route($o['ruta'], $o['params'] ?? []) : null;
                 return $o;
             })
             ->values();
@@ -146,6 +158,12 @@ class AccesoService
             if ($a->tempVigente() && $a->nivelTemp && $a->tipoTemp) {
                 $out->push(['modulo' => $a->nivelTemp->IdModulo, 'letras' => (string) $a->tipoTemp->Nombre]);
             }
+        }
+
+        // Secretaría Académica gestiona a sus secretarias: acceso implícito al módulo de Administración
+        // (el alcance real lo limita AccesoService::usuariosGestionables)
+        if ($u->Rol === 'SecretariaAcademica' && ($ma = $this->idModulo('MA'))) {
+            $out->push(['modulo' => $ma, 'letras' => 'CRUD']);
         }
 
         return $out;

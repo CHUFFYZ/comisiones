@@ -21,8 +21,10 @@
     <form method="GET" class="d-flex flex-wrap gap-2 mb-3">
         <div class="input-group rounded-pill w-auto">
             <span class="input-group-text bg-transparent"><i class="fa-solid fa-magnifying-glass"></i></span>
-            <input type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Oficio o asunto">
+            <input type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Oficio, asunto o profesor">
         </div>
+        <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis align-self-center px-3 py-2"><i class="fa-solid fa-layer-group me-1"></i>Total: {{ $totalAlcance }}</span>
+        @if ($comisiones->total() !== $totalAlcance)<span class="small text-body-secondary align-self-center">{{ $comisiones->total() }} coincidencias</span>@endif
         <select name="tipo" class="form-select rounded-pill w-auto" onchange="this.form.submit()">
             <option value="">Todos los tipos</option>
             @foreach ($tipos as $t)

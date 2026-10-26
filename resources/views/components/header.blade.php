@@ -101,13 +101,6 @@
                         <li><button type="button" class="dropdown-item small" data-bs-toggle="modal" data-bs-target="#modalSimular">
                             <i class="fa-solid fa-user-secret w-20px"></i> Simular secretaria</button></li>
                     @endif
-                    @if ($esProfesor)
-                        <li>
-                            <a class="dropdown-item small" href="{{ route('profesor.panel') }}">
-                                <i class="fa-solid fa-chalkboard-user w-20px"></i> Mis comisiones
-                            </a>
-                        </li>
-                    @endif
 
                     <!-- Mis módulos: botón colapsable, los módulos son sus opciones -->
                     <li>
@@ -119,6 +112,14 @@
                         </button>
                         <div class="collapse" id="menuModulos">
                             <ul class="list-unstyled mb-0 ps-3">
+                                {{-- Mis comisiones (módulo del profesor) --}}
+                                @if ($esProfesor)
+                                    <li>
+                                        <a class="dropdown-item small" href="{{ route('profesor.panel') }}">
+                                            <i class="fa-solid fa-chalkboard-user w-20px"></i> Mis comisiones
+                                        </a>
+                                    </li>
+                                @endif
                                 @forelse ($modulosMenu as $m)
                                     <li>
                                         <a class="dropdown-item small" href="{{ route('modulos.show', $m->Clave) }}">
@@ -127,7 +128,7 @@
                                         </a>
                                     </li>
                                 @empty
-                                    <li class="dropdown-item-text small text-body-secondary">Sin módulos asignados</li>
+                                    @unless ($esProfesor)<li class="dropdown-item-text small text-body-secondary">Sin módulos asignados</li>@endunless
                                 @endforelse
                             </ul>
                         </div>

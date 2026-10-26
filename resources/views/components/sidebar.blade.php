@@ -25,14 +25,6 @@
                 </a>
             </li>
 
-            @if ($esProfesor)
-                <li class="nav-item mb-1">
-                    <a href="{{ route('profesor.panel') }}" class="nav-link {{ request()->routeIs('profesor.*') ? 'active' : '' }}">
-                        <i class="fa-solid fa-chalkboard-user w-20px"></i>
-                        <span>Mis comisiones</span>
-                    </a>
-                </li>
-            @endif
 
             <li class="nav-item mb-1">
                 <a href="{{ route('chat.index') }}" class="nav-link {{ request()->routeIs('chat.*') ? 'active' : '' }}">
@@ -62,6 +54,15 @@
 
                 <div class="collapse show" id="sidebarModulos">
                     <ul class="nav nav-pills flex-column ps-3 mt-1 submenu-modulos">
+                        {{-- Mis comisiones (módulo del profesor) --}}
+                        @if ($esProfesor)
+                            <li class="nav-item mb-1">
+                                <a href="{{ route('profesor.panel') }}" class="nav-link py-2 small {{ request()->routeIs('profesor.*') ? 'active' : '' }}">
+                                    <i class="fa-solid fa-chalkboard-user w-20px"></i>
+                                    <span>Mis comisiones</span>
+                                </a>
+                            </li>
+                        @endif
                         @forelse ($modulosMenu as $m)
                             <li class="nav-item mb-1">
                                 <a href="{{ route('modulos.show', $m->Clave) }}"
@@ -71,7 +72,7 @@
                                 </a>
                             </li>
                         @empty
-                            <li class="small text-body-secondary px-3 py-2">Sin módulos asignados</li>
+                            @unless ($esProfesor)<li class="small text-body-secondary px-3 py-2">Sin módulos asignados</li>@endunless
                         @endforelse
                     </ul>
                 </div>

@@ -55,13 +55,33 @@
     </div>
 
     <!-- Toast Notifications Container -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3 z-3">
+    <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3 toast-superior">
         <div id="appToast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body" id="toastMessage"></div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
+    </div>
+
+    <!-- Modal de confirmación (reemplaza confirm() del navegador) -->
+    <div class="modal fade" id="modalConfirmar" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title">Confirmar acción</h5></div>
+                <div class="modal-body small" data-confirm-msg></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" data-confirm-ok>Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Foto ampliada -->
+    <div id="visorFoto" class="visor-foto" role="dialog" aria-label="Foto ampliada">
+        <button type="button" class="btn-close btn-close-white visor-cerrar" aria-label="Cerrar"></button>
+        <img id="visorImg" alt="Foto de perfil">
     </div>
 
     <!-- Bootstrap 5.3 Bundle JS -->
@@ -97,6 +117,48 @@
                 try { cerrado = localStorage.getItem('cati.menu') === 'cerrado'; } catch (x) {}
                 root.classList.toggle('menu-open', e.matches && !cerrado);
             });
+        })();
+
+        // Confirmación con modal propio. Uso: confirmar(msg, titulo, boton) -> Promise<boolean>
+        // o en un formulario: <form data-confirm="¿Seguro?" data-confirm-titulo="..." data-confirm-boton="...">
+        function confirmar(mensaje, titulo = 'Confirmar acción', boton = 'Confirmar') {
+            return new Promise(resolve => {
+                const el = document.getElementById('modalConfirmar');
+                el.querySelector('.modal-title').textContent = titulo;
+                el.querySelector('[data-confirm-msg]').textContent = mensaje;
+                const ok = el.querySelector('[data-confirm-ok]');
+                ok.textContent = boton;
+                const modal = bootstrap.Modal.getOrCreateInstance(el);
+                let res = false;
+                const aceptar = () => { res = true; modal.hide(); };
+                ok.addEventListener('click', aceptar);
+                el.addEventListener('hidden.bs.modal', () => { ok.removeEventListener('click', aceptar); resolve(res); }, { once: true });
+                modal.show();
+            });
+        }
+        document.addEventListener('submit', async e => {
+            const f = e.target.closest('form[data-confirm]');
+            if (!f || f.dataset.ok) return;
+            e.preventDefault();
+            if (await confirmar(f.dataset.confirm, f.dataset.confirmTitulo || undefined, f.dataset.confirmBoton || undefined)) {
+                f.dataset.ok = '1';
+                f.requestSubmit ? f.requestSubmit() : f.submit();
+            }
+        });
+
+        // Foto ampliada: cualquier elemento con data-ampliar="url"
+        (function () {
+            const visor = document.getElementById('visorFoto');
+            document.addEventListener('click', e => {
+                const t = e.target.closest('[data-ampliar]');
+                if (t && t.dataset.ampliar) {
+                    document.getElementById('visorImg').src = t.dataset.ampliar;
+                    visor.classList.add('abierto');
+                } else if (e.target.closest('#visorFoto')) {
+                    visor.classList.remove('abierto');
+                }
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') visor.classList.remove('abierto'); });
         })();
 
         // Filas clicables (data-href), sin interferir con botones, enlaces o formularios

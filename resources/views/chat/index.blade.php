@@ -9,9 +9,9 @@
         <p class="text-muted small mb-0">Escribe a cualquier usuario, sin importar su facultad o rol.</p>
     </div>
 
-    <div class="row g-3 chat-wrap">
+    <div class="row g-3 chat-wrap" id="chatWrap">
         {{-- Lista --}}
-        <div class="col-md-4 col-xl-3 h-100">
+        <div class="col-md-4 col-xl-3 h-100 chat-list-column">
             <div class="card h-100">
                 @if ($esSU)
                     <ul class="nav nav-tabs px-2 pt-2">
@@ -36,10 +36,13 @@
         </div>
 
         {{-- Conversación --}}
-        <div class="col-md-8 col-xl-9 h-100">
+        <div class="col-md-8 col-xl-9 h-100 chat-conversation" id="chatConversation">
             <div class="card h-100">
                 <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2" id="chatCabecera">
                     <span class="fw-semibold">Selecciona una conversación</span>
+                    <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
+                        <i class="fa-solid fa-xmark me-1"></i> Cerrar
+                    </button>
                 </div>
                 <div class="chat-mensajes flex-grow-1 p-3 d-flex flex-column gap-2" id="mensajes"></div>
                 <form id="formEnviar" class="p-3 border-top d-none">
@@ -73,6 +76,7 @@
         abrir: @json(route('chat.abrir')),
         perfil: @json(route('chat.perfil', '__ID__')),
         mensajes: @json(route('chat.mensajes', '__ID__')),
+        eliminar: @json(route('chat.eliminar', '__ID__')),
         supMsg: @json(route('chat.supervision.mensajes', '__ID__')),
     };
     const MI_FAC = @json($miFacultad);
@@ -124,16 +128,27 @@
                 <div class="fw-semibold">${esc(c.nombre)} ${badgeRol(c.rol)} ${badgeFac(c.facultad)}</div>
                 ${c.anonimo ? '' : `<small class="${c.enLinea ? 'text-success' : 'text-body-secondary'}">${
                     c.enLinea ? '● En línea' : (c.conexion ? 'Últ. conexión: ' + esc(c.conexion) : 'Sin conexión registrada')}</small>`}
-            </div>`;
+            </div>
+            <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
+                <i class="fa-solid fa-xmark me-1"></i> Cerrar
+            </button>`;
     }
 
     async function abrirConversacion(id, titulo) {
         activa = id; ultimaFirma = '';
-        $('chatCabecera').innerHTML = `<span class="fw-semibold">${esc(titulo)}</span>`;
+        $('chatWrap').classList.add('conversacion-abierta');
+        $('chatCabecera').innerHTML = `<span class="fw-semibold">${esc(titulo)}</span>
+            <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
+                <i class="fa-solid fa-xmark me-1"></i> Cerrar
+            </button>`;
         $('mensajes').innerHTML = '';
         await cargarMensajes(true);
         cargarLista();
     }
+
+    $('chatCabecera').addEventListener('click', e => {
+        if (e.target.closest('#btnCerrarConversacion')) $('chatWrap').classList.remove('conversacion-abierta');
+    });
 
     async function cargarMensajes(forzar) {
         if (!activa) return;
@@ -158,7 +173,7 @@
                 });
                 if (forzar || alFinal) caja.scrollTop = caja.scrollHeight;
             }
-            if (modo === 'mios') cabecera(d.contacto);
+            if (modo === 'mios') { cabecera(d.contacto); botonEliminar(); }
 
             const puede = modo === 'mios' && d.puedeResponder;
             $('formEnviar').classList.toggle('d-none', !puede);
@@ -166,6 +181,32 @@
             $('soloLectura').textContent = modo === 'mios' ? 'No puedes responder en esta conversación.' : 'Modo supervisión: solo lectura.';
         } catch (e) {}
     }
+
+    // Eliminar chat (borrado lógico: solo se oculta para mí)
+    function botonEliminar() {
+        if (!activa || modo !== 'mios') return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-ghost is-danger btn-sm ms-auto';
+        b.dataset.eliminar = '1'; b.title = 'Eliminar chat';
+        b.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        $('chatCabecera').appendChild(b);
+    }
+    $('chatCabecera').addEventListener('click', async e => {
+        if (!e.target.closest('[data-eliminar]') || !activa) return;
+        if (!await confirmar('Esta conversación se quitará de tu lista. La otra persona seguirá viéndola.', 'Eliminar chat', 'Eliminar')) return;
+        try {
+            await api(RUTAS.eliminar.replace('__ID__', activa), { method: 'DELETE' });
+            activa = null; ultimaFirma = '';
+            $('mensajes').innerHTML = '';
+            $('chatCabecera').innerHTML = `<span class="fw-semibold">Selecciona una conversación</span>
+                <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
+                    <i class="fa-solid fa-xmark me-1"></i> Cerrar
+                </button>`;
+            $('chatWrap').classList.remove('conversacion-abierta');
+            $('formEnviar').classList.add('d-none'); $('soloLectura').classList.add('d-none');
+            cargarLista(); showToast('Chat eliminado de tu lista.');
+        } catch (err) { showToast(err.message, 'error'); }
+    });
 
     $('lista').addEventListener('click', e => {
         if (e.target.closest('[data-perfil]')) return;
@@ -192,7 +233,7 @@
         try {
             const p = await api(RUTAS.perfil.replace('__ID__', b.dataset.perfil));
             $('perfilBody').innerHTML = `
-                ${avatar(p.foto, p.nombreCompleto, 'chat-avatar--xl mx-auto mb-3')}
+                <div class="mb-3"><span role="button" data-ampliar="${esc(p.foto || '')}" class="d-inline-block">${avatar(p.foto, p.nombreCompleto, 'chat-avatar--xl')}</span></div>
                 <h5 class="font-syne mb-1">${esc(p.nombreCompleto)}</h5>
                 <div class="mb-3">${badgeRol(p.rol)} ${badgeFac(p.facultadClave)}</div>
                 <dl class="row small text-start mb-0">
@@ -264,14 +305,39 @@
         $('tabMios')?.classList.toggle('active', m === 'mios');
         $('tabSup')?.classList.toggle('active', m === 'sup');
         $('btnNuevo').classList.toggle('d-none', m === 'sup');
-        $('mensajes').innerHTML = ''; $('chatCabecera').innerHTML = '<span class="fw-semibold">Selecciona una conversación</span>';
+        $('mensajes').innerHTML = ''; $('chatCabecera').innerHTML = `<span class="fw-semibold">Selecciona una conversación</span>
+            <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
+                <i class="fa-solid fa-xmark me-1"></i> Cerrar
+            </button>`;
+        $('chatWrap').classList.remove('conversacion-abierta');
         $('formEnviar').classList.add('d-none'); $('soloLectura').classList.add('d-none');
         cargarLista();
     }
     $('tabMios')?.addEventListener('click', () => cambiarModo('mios'));
     $('tabSup')?.addEventListener('click', () => cambiarModo('sup'));
 
-    cargarLista();
+    const usuarioInicial = new URLSearchParams(window.location.search).get('usuario');
+    if (usuarioInicial) {
+        const idUsuario = Number(usuarioInicial);
+        if (Number.isInteger(idUsuario) && idUsuario > 0) {
+            api(RUTAS.abrir, { method: 'POST', body: JSON.stringify({ IdUsuario: idUsuario }) })
+                .then(async d => {
+                    history.replaceState(null, '', window.location.pathname);
+                    await cargarLista();
+                    await abrirConversacion(d.id, '');
+                })
+                .catch(err => {
+                    history.replaceState(null, '', window.location.pathname);
+                    showToast(err.message, 'error');
+                    cargarLista();
+                });
+        } else {
+            history.replaceState(null, '', window.location.pathname);
+            cargarLista();
+        }
+    } else {
+        cargarLista();
+    }
     setInterval(() => { cargarLista(); if (activa) cargarMensajes(false); }, 5000);
 </script>
 @endpush

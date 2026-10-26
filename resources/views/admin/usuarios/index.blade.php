@@ -30,7 +30,7 @@
                 <thead><tr><th>Matrícula</th><th>Nombre</th><th>Rol</th><th class="d-none d-md-table-cell">Facultad</th><th class="d-none d-lg-table-cell">Correo</th><th class="text-end">Acciones</th></tr></thead>
                 <tbody>
                 @forelse ($usuarios as $x)
-                    <tr>
+                    <tr class="fila-click" data-href="{{ route('admin.usuarios.show', $x->Id) }}">
                         <td class="font-monospace small">{{ $x->Matricula }}</td>
                         <td>{{ $x->nombre_con_grado }}</td>
                         <td><span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">{{ $x->rol_nombre }}</span></td>
@@ -40,7 +40,7 @@
                             <div class="d-flex justify-content-end gap-2">
                                 @if ($activos)
                                     <a href="{{ route('admin.usuarios.edit', $x->Id) }}" class="btn btn-ghost btn-sm"><i class="fa-solid fa-pen me-1"></i> Editar</a>
-                                    <form action="{{ route('admin.usuarios.baja', $x->Id) }}" method="POST" class="m-0" onsubmit="return confirm('¿Dar de baja a {{ $x->nombre_corto }}?')">
+                                    <form action="{{ route('admin.usuarios.baja', $x->Id) }}" method="POST" class="m-0" data-confirm="¿Dar de baja a {{ $x->nombre_corto }}?" data-confirm-titulo="Dar de baja" data-confirm-boton="Dar de baja">
                                         @csrf @method('DELETE')
                                         <button class="btn btn-ghost is-danger btn-sm"><i class="fa-solid fa-user-slash me-1"></i> Baja</button>
                                     </form>

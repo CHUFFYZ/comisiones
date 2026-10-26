@@ -30,7 +30,7 @@ class ComisionService
     /** Secretaría Académica y superusuario ven todos los tipos. */
     public function veTodo(Usuario $u): bool
     {
-        return $u->Rol === 'SecretariaAcademica' || $this->acceso->esSuperUsuario($u);
+        return in_array($u->Rol, ['SecretariaAcademica', 'Administrador'], true) || $this->acceso->esSuperUsuario($u);
     }
 
     public function tiposPermitidos(Usuario $u): Collection

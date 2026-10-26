@@ -67,6 +67,8 @@ class ChatController extends Controller
         $convs = ChatConversacion::where(fn ($q) => $q->where('IdUsuario1', $u->Id)->orWhere('IdUsuario2', $u->Id))
             ->orderByDesc('UltimoMensajeAt')->orderByDesc('Id')->get();
 
+        $convs = $convs->reject(fn ($c) => $c->ocultaPara((int) $u->Id))->values();
+
         return response()->json($this->listar($convs, $u, false));
     }
 
@@ -95,7 +97,7 @@ class ChatController extends Controller
         $u = $r->user();
         $c = $this->propia($u, $id);
 
-        $msgs = ChatMensaje::where('IdConversacion', $c->Id)->orderByDesc('Id')->limit(200)->get()->reverse()->values();
+        $msgs = ChatMensaje::where('IdConversacion', $c->Id)->when($c->corteDe((int) $u->Id), fn ($q, $corte) => $q->where('CreatedAt', '>', $corte))->orderByDesc('Id')->limit(200)->get()->reverse()->values();
 
         ChatMensaje::where('IdConversacion', $c->Id)->where('IdRemitente', '<>', $u->Id)
             ->whereNull('LeidoAt')->update(['LeidoAt' => now()]);
@@ -126,6 +128,16 @@ class ChatController extends Controller
         $c->update(['UltimoMensajeAt' => now()]);
 
         return response()->json(['id' => $m->Id]);
+    }
+
+    /** Borrado lógico: solo oculta la conversación para quien la elimina (la otra persona y supervisión la siguen viendo). */
+    public function eliminar(Request $r, int $id): JsonResponse
+    {
+        $u = $r->user();
+        $c = $this->propia($u, $id);
+        $c->update([$c->columnaOculto((int) $u->Id) => now()]);
+
+        return response()->json(['ok' => true]);
     }
 
     /* ───────── supervisión (solo superusuario) ───────── */

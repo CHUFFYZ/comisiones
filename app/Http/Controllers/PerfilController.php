@@ -5,12 +5,41 @@ namespace App\Http\Controllers;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 
 class PerfilController extends Controller
 {
     public function index(Request $r)
     {
         return view('perfil.index', ['u' => $r->user()->load('facultad')]);
+    }
+
+    /** Cambio de contraseña del propio usuario. */
+    public function password(Request $r)
+    {
+        $r->validate([
+            'PasswordActual' => 'required|string',
+            'PasswordNueva'  => 'required|string|min:8|confirmed|different:PasswordActual',
+        ], [
+            'PasswordActual.required'  => 'Escribe tu contraseña actual.',
+            'PasswordNueva.required'   => 'Escribe la nueva contraseña.',
+            'PasswordNueva.min'        => 'La nueva contraseña debe tener al menos 8 caracteres.',
+            'PasswordNueva.confirmed'  => 'La confirmación no coincide con la nueva contraseña.',
+            'PasswordNueva.different'  => 'La nueva contraseña debe ser distinta de la actual.',
+        ]);
+
+        $u = $r->user();
+        if (!Hash::check($r->PasswordActual, $u->Contrasena)) {
+            return back()->withErrors(['PasswordActual' => 'La contraseña actual no es correcta.']);
+        }
+
+        Usuario::where('Id', $u->Id)->update([
+            'Contrasena' => Hash::make($r->PasswordNueva),
+            'UpdatedAt'  => now(),
+            'UpdatedBy'  => $u->Matricula,
+        ]);
+
+        return back()->with('ok', 'Contraseña actualizada.');
     }
 
     /** public/image/usuarios/{FACULTAD}/{ROL}/{MATRICULA}.ext */

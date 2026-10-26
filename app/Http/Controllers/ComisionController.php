@@ -24,7 +24,10 @@ class ComisionController extends Controller
 
         $q = $this->svc->visibles($u, $anuladas)
             ->when($r->filled('q'), fn ($q) => $q->where(fn ($w) => $w
-                ->where('NOficio', 'like', "%{$r->q}%")->orWhere('Asunto', 'like', "%{$r->q}%")))
+                ->where('NOficio', 'like', "%{$r->q}%")->orWhere('Asunto', 'like', "%{$r->q}%")
+                ->orWhereHas('profesores', fn ($p) => $p->where(fn ($n) => $n
+                    ->where('Nombre', 'like', "%{$r->q}%")->orWhere('Apellido', 'like', "%{$r->q}%")
+                    ->orWhereRaw("CONCAT(Nombre, ' ', Apellido) like ?", ["%{$r->q}%"])))))
             ->when($r->filled('estado'), fn ($q) => $q->where('IdEstado', $r->estado))
             ->when($r->filled('tipo'), fn ($q) => $q->where('IdTipoComision', $r->tipo));
 
@@ -33,6 +36,7 @@ class ComisionController extends Controller
             'estados'    => EstadoComision::where('Activo', 1)->get(),
             'tipos'      => $this->svc->tiposPermitidos($u),
             'anuladas'   => $anuladas,
+            'totalAlcance' => $this->svc->visibles($u, $anuladas)->count(),
         ]);
     }
 

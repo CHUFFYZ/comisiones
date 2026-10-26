@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Permisos temporales · CATI')
+@section('title', 'Permisos · CATI')
 
 @section('content')
 <div class="container-fluid p-0">
     <div class="mb-4">
-        <h2 class="font-syne text-dark mb-1">Permisos temporales</h2>
-        <p class="text-muted small mb-0">Acceso con fecha de inicio y fin para los usuarios de tu alcance.</p>
+        <h2 class="font-syne text-dark mb-1">Permisos</h2>
+        <p class="text-muted small mb-0">Gestiona permisos permanentes y temporales para los usuarios de tu alcance.</p>
     </div>
 
     @if ($errors->any())
@@ -16,14 +16,31 @@
     <div class="card">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead><tr><th>Usuario</th><th>Rol</th><th class="d-none d-md-table-cell">Facultad</th><th>Permiso temporal</th><th class="text-end">Acciones</th></tr></thead>
+                <thead><tr><th>Usuario</th><th>Rol</th><th class="d-none d-md-table-cell">Facultad</th><th>Permiso permanente</th><th>Permiso temporal</th><th class="text-end">Acciones</th></tr></thead>
                 <tbody>
                 @forelse ($usuarios as $x)
-                    @php $a = $x->asignaciones->first(fn ($a) => $a->IdTipoPermisoTemp && $a->IdNivelAccesoTemp); @endphp
-                    <tr>
+                    @php
+                        $a = $x->asignaciones->first(fn ($a) => $a->IdTipoPermisoTemp && $a->IdNivelAccesoTemp);
+                        $permanentes = $x->asignaciones->filter(fn ($p) => $p->IdNivelAcceso && $p->IdTipoPermiso);
+                    @endphp
+                    <tr class="fila-click" data-href="{{ route('admin.usuarios.show', $x->Id) }}">
                         <td>{{ $x->nombre_con_grado }}<div class="small font-monospace text-body-secondary">{{ $x->Matricula }}</div></td>
                         <td>{{ $x->rol_nombre }}</td>
                         <td class="d-none d-md-table-cell">{{ $x->facultad->Clave ?? '—' }}</td>
+                        <td class="small">
+                            @forelse ($permanentes as $p)
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <span>{{ $p->nivel->modulo->Nombre ?? '' }} · <span class="font-monospace">{{ $p->tipo->Nombre ?? '' }}</span></span>
+                                    <form action="{{ route('admin.permisos.permanente.destroy', [$x->Id, $p->Id]) }}" method="POST" class="m-0"
+                                          data-confirm="¿Quitar el permiso permanente de {{ $x->nombre_corto }}?" data-confirm-titulo="Quitar permiso" data-confirm-boton="Quitar">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-ghost is-danger btn-sm" title="Quitar permiso permanente" aria-label="Quitar permiso permanente"><i class="fa-solid fa-xmark"></i></button>
+                                    </form>
+                                </div>
+                            @empty
+                                <span class="text-body-tertiary">—</span>
+                            @endforelse
+                        </td>
                         <td class="small">
                             @if ($a)
                                 {{ $a->nivelTemp->modulo->Nombre ?? '' }} · <span class="font-monospace">{{ $a->tipoTemp->Nombre ?? '' }}</span><br>
@@ -37,6 +54,9 @@
                         </td>
                         <td>
                             <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-ghost is-brand btn-sm" data-asignar-permanente="{{ $x->Id }}" data-nombre="{{ $x->nombre_corto }}" @disabled($niveles->isEmpty())>
+                                    <i class="fa-solid fa-infinity me-1"></i> Permanente
+                                </button>
                                 <button type="button" class="btn btn-ghost is-brand btn-sm" data-asignar="{{ $x->Id }}" data-nombre="{{ $x->nombre_corto }}">
                                     <i class="fa-solid fa-clock me-1"></i> Asignar
                                 </button>
@@ -50,12 +70,41 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center py-5 text-body-secondary"><i class="fa-solid fa-inbox fs-1 opacity-50 mb-2 d-block"></i> Sin usuarios.</td></tr>
+                    <tr><td colspan="6" class="text-center py-5 text-body-secondary"><i class="fa-solid fa-inbox fs-1 opacity-50 mb-2 d-block"></i> Sin usuarios.</td></tr>
                 @endforelse
                 </tbody>
             </table>
         </div>
         @if ($usuarios->hasPages())<div class="card-footer bg-white">{{ $usuarios->links() }}</div>@endif
+    </div>
+</div>
+
+<div class="modal fade" id="modalPermisoPermanente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" id="formPermisoPermanente" class="modal-content">
+            @csrf
+            <div class="modal-header"><h5 class="modal-title">Permiso permanente · <span id="permisoPermanenteNombre"></span></h5></div>
+            <div class="modal-body row g-3">
+                <div class="col-md-8">
+                    <label class="form-label" for="IdNivelAcceso">Nivel de acceso <span class="text-danger">*</span></label>
+                    <select id="IdNivelAcceso" name="IdNivelAcceso" class="form-select" required>
+                        @foreach ($niveles as $n)
+                            <option value="{{ $n->Id }}">{{ $n->modulo->Nombre ?? '' }} · {{ $n->Nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="IdTipoPermiso">Permiso <span class="text-danger">*</span></label>
+                    <select id="IdTipoPermiso" name="IdTipoPermiso" class="form-select" required>
+                        @foreach ($tipos as $t)<option value="{{ $t->Id }}">{{ $t->Nombre }}</option>@endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Asignar permiso permanente</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -99,6 +148,12 @@
 @push('scripts')
 <script>
     const rutaPermiso = @json(route('admin.permisos.store', '__ID__'));
+    const rutaPermisoPermanente = @json(route('admin.permisos.permanente.store', '__ID__'));
+    document.querySelectorAll('[data-asignar-permanente]').forEach(b => b.addEventListener('click', () => {
+        document.getElementById('formPermisoPermanente').action = rutaPermisoPermanente.replace('__ID__', b.dataset.asignarPermanente);
+        document.getElementById('permisoPermanenteNombre').textContent = b.dataset.nombre;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalPermisoPermanente')).show();
+    }));
     document.querySelectorAll('[data-asignar]').forEach(b => b.addEventListener('click', () => {
         document.getElementById('formPermiso').action = rutaPermiso.replace('__ID__', b.dataset.asignar);
         document.getElementById('permisoNombre').textContent = b.dataset.nombre;

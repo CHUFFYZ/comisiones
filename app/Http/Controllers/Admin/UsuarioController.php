@@ -22,6 +22,19 @@ class UsuarioController extends Controller
     public function index(Request $r)  { return $this->listar($r, true); }
     public function bajas(Request $r)  { return $this->listar($r, false); }
 
+    public function show(Request $r, int $id)
+    {
+        $usuario = $this->acc->usuariosGestionables($r->user())->with(['facultad', 'rolModelo'])->findOrFail($id);
+        abort_if($this->acc->esSuperUsuario($usuario) && !$this->acc->esSuperUsuario($r->user()), 403, 'Usuario no disponible.');
+
+        return view('admin.usuarios.show', [
+            'usuario' => $usuario,
+            'puedeMensaje' => (int) $usuario->Activo === 1
+                && (int) $usuario->Id !== (int) $r->user()->Id
+                && (!$this->acc->esSuperUsuario($usuario) || $this->acc->esSuperUsuario($r->user())),
+        ]);
+    }
+
     private function listar(Request $r, bool $activos)
     {
         $q = $this->acc->usuariosGestionables($r->user())->with('facultad')->where('Activo', $activos ? 1 : 0)

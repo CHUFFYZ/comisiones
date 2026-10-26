@@ -11,6 +11,9 @@
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis font-monospace">Permiso: {{ $permiso }}</span>
+            @if ($puedeReporte)
+                <a href="{{ route('reportes.index', $modulo->Clave) }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-print me-1"></i> Generar reporte</a>
+            @endif
             @if ($stats) @puede('MSC', 'crear')
                 <a href="{{ route('comisiones.create') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1"></i> Nueva comisión</a>
             @endpuede @endif
@@ -41,7 +44,15 @@
         @endforeach
     </div>
 
-    <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+        <div class="col">
+            <div class="card stat-card h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div><div class="stat-num">{{ $stats['total'] }}</div><div class="stat-label">Comisiones totales</div></div>
+                    <div class="stat-icon bg-primary-subtle text-primary"><i class="fa-solid fa-layer-group"></i></div>
+                </div>
+            </div>
+        </div>
         <div class="col">
             <div class="card stat-card h-100">
                 <div class="d-flex align-items-center justify-content-between">
@@ -126,6 +137,36 @@
         </div>
     </div>
 @else
+    @if ($statsAdmin)
+        @php
+            $tarjetas = [
+                ['Usuarios activos', $statsAdmin['activos'], 'fa-users', 'estado-terminado'],
+                ['Bajas', $statsAdmin['bajas'], 'fa-user-slash', 'estado-no-iniciado'],
+                ['En línea ahora', $statsAdmin['enLinea'], 'fa-circle', 'estado-proceso'],
+                ['Permisos temporales vigentes', $statsAdmin['tempVigentes'], 'fa-clock', 'estado-proceso'],
+                ['Plantillas activas', $statsAdmin['plantillas'], 'fa-file-lines', 'estado-terminado'],
+                ['Usuarios totales', $statsAdmin['total'], 'fa-layer-group', 'bg-secondary-subtle text-secondary'],
+            ];
+        @endphp
+        <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3 mb-3">
+            @foreach ($tarjetas as [$etq, $n, $ico, $cls])
+                <div class="col">
+                    <div class="card stat-card h-100">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div><div class="stat-num">{{ $n }}</div><div class="stat-label">{{ $etq }}</div></div>
+                            <div class="stat-icon {{ $cls }}"><i class="fa-solid {{ $ico }}"></i></div>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        <div class="row g-3 mb-4">
+            <div class="col-lg-4"><div class="card p-3 h-100"><h6 class="font-syne mb-3">Usuarios por rol</h6><div class="position-relative graf-caja"><canvas id="grafRol"></canvas></div></div></div>
+            <div class="col-lg-4"><div class="card p-3 h-100"><h6 class="font-syne mb-3">Usuarios por facultad</h6><div class="position-relative graf-caja"><canvas id="grafFac"></canvas></div></div></div>
+            <div class="col-lg-4"><div class="card p-3 h-100"><h6 class="font-syne mb-3">Altas · últimos 6 meses</h6><div class="position-relative graf-caja"><canvas id="grafAltas"></canvas></div></div></div>
+        </div>
+    @endif
+
     {{-- Módulos sin tablero: accesos a sus opciones --}}
     <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
         @forelse ($opciones as $op)
@@ -182,6 +223,37 @@
         data: { labels: meses.map(m => m.label), datasets: [{ data: meses.map(m => m.n), backgroundColor: css('--naranja2'), borderRadius: 8 }] },
         options: { ...opciones, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
     });
+</script>
+@endpush
+@endif
+@if ($statsAdmin)
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+    (() => {
+        const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+        const porRol = @json($statsAdmin['porRol']);
+        const porFac = @json($statsAdmin['porFac']);
+        const altas  = @json($statsAdmin['altas']);
+        const base = { responsive: true, maintainAspectRatio: false };
+        const ejes = { y: { beginAtZero: true, ticks: { precision: 0 } } };
+        new Chart(document.getElementById('grafRol'), {
+            type: 'doughnut',
+            data: { labels: Object.keys(porRol), datasets: [{ data: Object.values(porRol), borderWidth: 0,
+                backgroundColor: [css('--naranja'), css('--naranja2'), css('--azul-m'), css('--verde'), css('--morado'), css('--amarillo')] }] },
+            options: { ...base, plugins: { legend: { position: 'bottom' } } }
+        });
+        new Chart(document.getElementById('grafFac'), {
+            type: 'bar',
+            data: { labels: Object.keys(porFac), datasets: [{ data: Object.values(porFac), backgroundColor: css('--naranja'), borderRadius: 8 }] },
+            options: { ...base, plugins: { legend: { display: false } }, scales: ejes }
+        });
+        new Chart(document.getElementById('grafAltas'), {
+            type: 'bar',
+            data: { labels: altas.map(m => m.label), datasets: [{ data: altas.map(m => m.n), backgroundColor: css('--naranja2'), borderRadius: 8 }] },
+            options: { ...base, plugins: { legend: { display: false } }, scales: ejes }
+        });
+    })();
 </script>
 @endpush
 @endif

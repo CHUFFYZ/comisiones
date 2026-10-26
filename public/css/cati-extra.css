@@ -18,3 +18,43 @@ img.usu-avatar { object-fit: cover; }
 .arbol-rol > summary { color: var(--gris); font-weight: 600; text-transform: uppercase; font-size: .68rem; letter-spacing: .06em; }
 .arbol-user { display: flex; align-items: center; gap: .5rem; width: 100%; border: 0; background: transparent; text-align: left; padding: .3rem .5rem; border-radius: 8px; font-size: .82rem; }
 .arbol-user:hover { background: var(--superficie-2); }
+
+/* Alertas (toast) arriba al centro */
+.toast-superior { z-index: 2000; width: min(92vw, 420px); }
+.toast-superior .toast { width: 100%; }
+.toast-superior .toast.show { animation: toastBajar .3s ease; }
+@keyframes toastBajar { from { opacity: 0; transform: translateY(-28px); } to { opacity: 1; transform: none; } }
+
+/* Foto ampliada */
+[data-ampliar]:not([data-ampliar=""]) { cursor: zoom-in; }
+.visor-foto { display: none; position: fixed; inset: 0; z-index: 2100; background: rgba(0, 0, 0, .85); align-items: center; justify-content: center; padding: 1rem; cursor: zoom-out; }
+.visor-foto.abierto { display: flex; }
+.visor-foto img { max-width: min(92vw, 900px); max-height: 90vh; border-radius: 12px; object-fit: contain; }
+.visor-cerrar { position: absolute; top: 1rem; right: 1rem; }
+
+/* Foto de profesor junto al nombre sin interferir con el acordeón */
+#accProfes .accordion-header { display: flex; align-items: stretch; }
+#accProfes .accordion-header .accordion-button { flex: 1 1 auto; min-width: 0; order: 1; }
+#accProfes .profesor-foto { display: inline-flex; align-items: center; justify-content: center; order: 0; border: 0; background: #fff; padding: 0 .85rem; }
+.profesor-foto:hover { background: var(--superficie-2); }
+.profesor-foto .chat-avatar { width: 40px; height: 40px; }
+
+@media (max-width: 767.98px) {
+    .chat-wrap { position: relative; height: auto; min-height: 0; flex: 1 1 auto; }
+    .chat-wrap .chat-list-column { height: min(62svh, 560px) !important; }
+    .chat-wrap .chat-conversation { display: none; }
+    .chat-wrap.conversacion-abierta::before {
+        content: ''; position: fixed; inset: 0; z-index: 1040;
+        background: rgba(18, 27, 40, .55);
+    }
+    .chat-wrap.conversacion-abierta .chat-conversation {
+        display: block; position: fixed; inset: max(4.5rem, env(safe-area-inset-top)) .75rem .75rem;
+        z-index: 1045; width: auto; height: auto !important; padding: 0;
+    }
+    .chat-wrap .chat-conversation .card { min-height: 0; }
+    #btnCerrarConversacion { display: inline-block; }
+}
+
+@media (min-width: 768px) {
+    #btnCerrarConversacion { display: none; }
+}
