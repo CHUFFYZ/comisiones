@@ -30,18 +30,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/simulacion', [SimulacionController::class, 'iniciar'])->name('simulacion.iniciar');
     Route::delete('/simulacion', [SimulacionController::class, 'terminar'])->name('simulacion.terminar');
 
-    Route::middleware('gestion.usuarios')->prefix('administracion')->name('admin.')->where(['id' => '[0-9]+'])->group(function () {
+    Route::middleware(['gestion.usuarios', 'modulo.acceso:leer,MA'])
+        ->prefix('administracion')->name('admin.')->where(['id' => '[0-9]+'])->group(function () {
         Route::get('usuarios',                 [UsuarioController::class, 'index'])->name('usuarios.index');
-        Route::get('usuarios/crear',           [UsuarioController::class, 'create'])->name('usuarios.create');
-        Route::post('usuarios',                [UsuarioController::class, 'store'])->name('usuarios.store');
-        Route::get('usuarios/bajas',           [UsuarioController::class, 'bajas'])->name('usuarios.bajas');
-        Route::get('usuarios/{id}/editar',     [UsuarioController::class, 'edit'])->name('usuarios.edit');
-        Route::put('usuarios/{id}',            [UsuarioController::class, 'update'])->name('usuarios.update');
-        Route::delete('usuarios/{id}',         [UsuarioController::class, 'baja'])->name('usuarios.baja');
-        Route::patch('usuarios/{id}/restaurar',[UsuarioController::class, 'restaurar'])->name('usuarios.restaurar');
-        Route::get('permisos',                 [PermisoController::class, 'index'])->name('permisos.index');
-        Route::post('permisos/{id}',           [PermisoController::class, 'store'])->name('permisos.store');
-        Route::delete('permisos/{id}',         [PermisoController::class, 'destroy'])->name('permisos.destroy');
+        Route::get('usuarios/crear',            [UsuarioController::class, 'create'])->middleware('modulo.acceso:crear,MA')->name('usuarios.create');
+        Route::post('usuarios',                [UsuarioController::class, 'store'])->middleware('modulo.acceso:crear,MA')->name('usuarios.store');
+        Route::get('usuarios/bajas',           [UsuarioController::class, 'bajas'])->middleware('modulo.acceso:eliminar,MA')->name('usuarios.bajas');
+        Route::get('usuarios/{id}/editar',     [UsuarioController::class, 'edit'])->middleware('modulo.acceso:actualizar,MA')->name('usuarios.edit');
+        Route::put('usuarios/{id}',            [UsuarioController::class, 'update'])->middleware('modulo.acceso:actualizar,MA')->name('usuarios.update');
+        Route::delete('usuarios/{id}',         [UsuarioController::class, 'baja'])->middleware('modulo.acceso:eliminar,MA')->name('usuarios.baja');
+        Route::patch('usuarios/{id}/restaurar',[UsuarioController::class, 'restaurar'])->middleware('modulo.acceso:eliminar,MA')->name('usuarios.restaurar');
+        Route::get('permisos',                 [PermisoController::class, 'index'])->middleware('modulo.acceso:actualizar,MA')->name('permisos.index');
+        Route::post('permisos/{id}',           [PermisoController::class, 'store'])->middleware('modulo.acceso:actualizar,MA')->name('permisos.store');
+        Route::delete('permisos/{id}',         [PermisoController::class, 'destroy'])->middleware('modulo.acceso:eliminar,MA')->name('permisos.destroy');
     });
 
     Route::get('/modulos', [ModuloController::class, 'index'])->name('modulos.index');
