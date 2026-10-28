@@ -1,0 +1,2 @@
+<span class="badge rounded-pill {{ $d->firmado ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis' }}"><i class="fa-solid fa-signature me-1"></i>Firma</span>
+<span class="badge rounded-pill {{ $d->sellado ? 'bg-success-subtle text-success-emphasis' : 'bg-secondary-subtle text-secondary-emphasis' }}"><i class="fa-solid fa-stamp me-1"></i>Sello</span>

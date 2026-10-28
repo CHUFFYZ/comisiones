@@ -32,6 +32,22 @@
                 @endif
             </div>
         </div>
+        @if (in_array($u->Rol, ['Director', 'SecretariaAcademica']))
+        <div class="card p-4 mt-4">
+            <h5 class="font-syne mb-3"><i class="fa-solid fa-signature me-1"></i> Mi firma y sello</h5>
+            <form action="{{ route('perfil.firma') }}" method="POST" enctype="multipart/form-data" class="row g-3">
+                @csrf
+                @foreach (['Firma' => $u->FirmaUrl, 'Sello' => $u->SelloUrl] as $campo => $url)
+                    <div class="col-md-6">
+                        <label class="form-label" for="{{ $campo }}">{{ $campo }} (PNG con fondo transparente, máx. 2 MB)</label>
+                        @if ($url)<div class="mb-2"><img src="{{ preg_match('#^https?://#i', $url) ? $url : asset($url) }}" alt="{{ $campo }} actual" style="max-height:70px;max-width:100%"></div>@endif
+                        <input type="file" id="{{ $campo }}" name="{{ $campo }}" accept=".png,.jpg,.jpeg,.webp" class="form-control">
+                    </div>
+                @endforeach
+                <div class="col-12 d-flex justify-content-end"><button class="btn btn-primary btn-sm">Guardar</button></div>
+            </form>
+        </div>
+        @endif
         <div class="col-lg-8">
             <div class="card p-4 mb-4">
                 <h5 class="font-syne mb-3">{{ $u->nombre_con_grado }}</h5>

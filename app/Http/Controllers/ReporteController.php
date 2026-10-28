@@ -102,7 +102,7 @@ class ReporteController extends Controller
                 $c->NOficio, $c->Asunto, $c->tipo->Nombre ?? '—',
                 $c->profesores->pluck('nombre_corto')->join(', '),
                 $c->FechaInicio->format('d/m/y') . ($c->FechaFin ? ' – ' . $c->FechaFin->format('d/m/y') : ''),
-                $c->estado->Nombre ?? '—', $c->constancia ? 'Sí' : 'No',
+                $c->estado->Nombre ?? '—', ['completa' => 'Sí', 'parcial' => 'Parcial', 'ninguna' => 'No'][$c->estado_constancias],
             ];
             if ($esSU) array_unshift($f, $c->facultad->Clave ?? '—');
             return $f;
@@ -150,8 +150,9 @@ class ReporteController extends Controller
 
         $fin = $com->where('IdEstado', 3);
         $indic = [
-            ['Finalizadas con constancia', $fin->filter(fn ($c) => $c->constancia)->count()],
-            ['Finalizadas sin constancia', $fin->filter(fn ($c) => !$c->constancia)->count()],
+            ['Finalizadas con constancias completas', $fin->filter(fn ($c) => $c->estado_constancias === 'completa')->count()],
+            ['Finalizadas con constancias parciales', $fin->filter(fn ($c) => $c->estado_constancias === 'parcial')->count()],
+            ['Finalizadas sin constancia', $fin->filter(fn ($c) => $c->estado_constancias === 'ninguna')->count()],
             ['Vencidas sin finalizar', $com->filter(fn ($c) => $c->IdEstado < 3 && $c->FechaFin && $c->FechaFin->lt(today()))->count()],
         ];
 

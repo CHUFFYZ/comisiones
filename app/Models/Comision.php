@@ -1,9 +1,12 @@
 <?php
 
 namespace App\Models;
+use App\Models\Concerns\Firmable;
+use Illuminate\Support\Collection;
 
 class Comision extends ModeloCati
 {
+    use Firmable;
     protected $table = 'comision';
 
     /** Clase de badge por estado (1-3 principales, 4 rechazado, 5 refutado). */
@@ -21,6 +24,7 @@ class Comision extends ModeloCati
         'FechaFin'     => 'date',
         'ReporteAt'    => 'datetime',
         'DeletedAt'    => 'datetime',
+        'FirmaAt'      => 'datetime', 'SelloAt' => 'datetime',
     ];
 
     public function tipo()           { return $this->belongsTo(TipoComision::class, 'IdTipoComision', 'Id'); }
@@ -29,9 +33,19 @@ class Comision extends ModeloCati
     public function facultad()       { return $this->belongsTo(Facultad::class, 'IdFacultad', 'Id'); }
     public function reporteUsuario() { return $this->belongsTo(Usuario::class, 'ReporteIdUsuario', 'Id'); }
     public function profesores()     { return $this->belongsToMany(Usuario::class, 'comision_profesor', 'IdComision', 'IdUsuario'); }
-    public function constancia()     { return $this->hasOne(Constancia::class, 'IdComision', 'Id')->where('Activo', 1); }
+    public function constancias() { return $this->hasMany(Constancia::class, 'IdComision', 'Id')->where('Activo', 1); }
     public function logs()           { return $this->hasMany(ComisionLog::class, 'IdComision', 'Id')->orderByDesc('Id'); }
 
+    public function getProfesoresCubiertosAttribute(): Collection
+    {
+        return $this->constancias->flatMap(fn ($k) => $k->profesores->pluck('Id'))->map(fn ($i) => (int) $i)->unique()->values();
+    }
+
+    public function getEstadoConstanciasAttribute(): string
+    {
+        $cub = $this->profesores_cubiertos->count();
+        return $cub === 0 ? 'ninguna' : ($cub >= $this->profesores->count() ? 'completa' : 'parcial');
+    }
     public function getClaseEstadoAttribute(): string
     {
         return self::CLASES[$this->IdEstado] ?? '';

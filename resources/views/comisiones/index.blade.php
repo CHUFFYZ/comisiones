@@ -65,7 +65,7 @@
                             {{ $c->FechaInicio->format('d/m/y') }}@if ($c->FechaFin) – {{ $c->FechaFin->format('d/m/y') }}@endif
                         </td>
                         <td><span class="badge rounded-pill badge-estado {{ $c->clase_estado }}">{{ $c->estado->Nombre }}</span></td>
-                        <td>
+                        <!-- <td>
                             @if ($c->constancia)
                                 <span class="badge rounded-pill bg-success-subtle text-success-emphasis"><i class="fa-solid fa-certificate me-1"></i>Con constancia</span>
                             @elseif ($c->IdEstado == 3)
@@ -73,7 +73,20 @@
                             @else
                                 <span class="text-body-tertiary">—</span>
                             @endif
+                        </td> -->
+                         <td>
+                            @php $ec = $c->estado_constancias; @endphp
+                            @if ($ec === 'completa')
+                                <span class="badge rounded-pill bg-success-subtle text-success-emphasis"><i class="fa-solid fa-certificate me-1"></i>Con constancia</span>
+                            @elseif ($ec === 'parcial')
+                                <span class="badge rounded-pill bg-info-subtle text-info-emphasis">Parcial {{ $c->profesores_cubiertos->count() }}/{{ $c->profesores->count() }}</span>
+                            @elseif ($c->IdEstado == 3)
+                                <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">Sin constancia</span>
+                            @else
+                                <span class="text-body-tertiary">—</span>
+                            @endif
                         </td>
+
                         @if ($anuladas)
                             <td>
                                 <div class="d-flex justify-content-end">

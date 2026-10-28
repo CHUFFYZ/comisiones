@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 class ChatController extends Controller
 {
     private ?array $su = null;
+    private const MINUTOS_EDICION = 15;
 
     public function index(Request $r)
     {
@@ -96,20 +97,32 @@ class ChatController extends Controller
     {
         $u = $r->user();
         $c = $this->propia($u, $id);
+        $contacto = $this->contacto($u, $c);
 
-        $msgs = ChatMensaje::where('IdConversacion', $c->Id)->when($c->corteDe((int) $u->Id), fn ($q, $corte) => $q->where('CreatedAt', '>', $corte))->orderByDesc('Id')->limit(200)->get()->reverse()->values();
+        $msgs = ChatMensaje::with('respuesta')->where('IdConversacion', $c->Id)
+            ->when($c->corteDe((int) $u->Id), fn ($q, $corte) => $q->where('CreatedAt', '>', $corte))
+            ->orderByDesc('Id')->limit(200)->get()->reverse()->values();
 
         ChatMensaje::where('IdConversacion', $c->Id)->where('IdRemitente', '<>', $u->Id)
             ->whereNull('LeidoAt')->update(['LeidoAt' => now()]);
 
+        $limite = now()->subMinutes(self::MINUTOS_EDICION);
+
         return response()->json([
-            'mensajes'       => $msgs->map(fn ($m) => [
+            'mensajes' => $msgs->map(fn ($m) => [
                 'id' => $m->Id, 'mio' => (int) $m->IdRemitente === (int) $u->Id,
                 'texto' => $m->Mensaje, 'fecha' => $m->CreatedAt->format('d/m/y H:i'),
                 'leido' => $m->LeidoAt !== null,
+                'editado' => $m->EditadoAt !== null,
+                'puedeEditar' => (int) $m->IdRemitente === (int) $u->Id && $m->CreatedAt->gt($limite),
+                'respuesta' => $m->respuesta ? [
+                    'id'    => $m->respuesta->Id,
+                    'autor' => (int) $m->respuesta->IdRemitente === (int) $u->Id ? 'Tú' : $contacto['nombre'],
+                    'texto' => mb_substr($m->respuesta->Mensaje, 0, 120),
+                ] : null,
             ])->values(),
             'puedeResponder' => $this->puedeEscribir($u, $c),
-            'contacto'       => $this->contacto($u, $c),
+            'contacto'       => $contacto,
         ]);
     }
 
@@ -117,17 +130,41 @@ class ChatController extends Controller
     {
         $u = $r->user();
         $c = $this->propia($u, $id);
-        $data = $r->validate(['Mensaje' => 'required|string|max:2000']);
+        $data = $r->validate(['Mensaje' => 'required|string|max:2000', 'IdRespuesta' => 'nullable|integer']);
 
         abort_unless($this->puedeEscribir($u, $c), 403, 'No puedes responder en esta conversación.');
 
+        // Solo se puede responder a un mensaje de esta misma conversación
+        $idResp = empty($data['IdRespuesta']) ? null
+            : ChatMensaje::where('IdConversacion', $c->Id)->where('Id', $data['IdRespuesta'])->value('Id');
+
         $m = ChatMensaje::create([
-            'IdConversacion' => $c->Id, 'IdRemitente' => $u->Id,
+            'IdConversacion' => $c->Id, 'IdRemitente' => $u->Id, 'IdRespuesta' => $idResp,
             'Mensaje' => trim($data['Mensaje']), 'CreatedAt' => now(),
         ]);
         $c->update(['UltimoMensajeAt' => now()]);
 
         return response()->json(['id' => $m->Id]);
+    }
+
+    /** Solo el autor y solo dentro de los primeros 15 minutos. */
+    public function editar(Request $r, int $id, int $mensaje): JsonResponse
+    {
+        $u = $r->user();
+        $c = $this->propia($u, $id);
+        $data = $r->validate(['Mensaje' => 'required|string|max:2000']);
+        abort_unless($this->puedeEscribir($u, $c), 403, 'No puedes editar en esta conversación.');
+
+        $m = ChatMensaje::where('IdConversacion', $c->Id)->where('IdRemitente', $u->Id)->findOrFail($mensaje);
+        abort_if($m->CreatedAt->lt(now()->subMinutes(self::MINUTOS_EDICION)), 422,
+            'Solo puedes editar un mensaje durante los primeros ' . self::MINUTOS_EDICION . ' minutos.');
+
+        $texto = trim($data['Mensaje']);
+        if ($texto !== $m->Mensaje) {
+            $m->update(['Mensaje' => $texto, 'EditadoAt' => now()]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     /** Borrado lógico: solo oculta la conversación para quien la elimina (la otra persona y supervisión la siguen viendo). */
@@ -164,6 +201,8 @@ class ChatController extends Controller
                 'id' => $m->Id, 'mio' => false, 'leido' => $m->LeidoAt !== null,
                 'autor' => $nombres[$m->IdRemitente]->nombre_corto ?? '—',
                 'texto' => $m->Mensaje, 'fecha' => $m->CreatedAt->format('d/m/y H:i'),
+                'editado' => $m->EditadoAt !== null, 'puedeEditar' => false,
+                'respuesta' => $m->respuesta ? ['id' => $m->respuesta->Id, 'autor' => $nombres[$m->respuesta->IdRemitente]->nombre_corto ?? '—', 'texto' => mb_substr($m->respuesta->Mensaje, 0, 120)] : null,
             ])->values(),
             'puedeResponder' => false,
             'contacto'       => null,

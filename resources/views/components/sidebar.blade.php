@@ -41,6 +41,15 @@
                     @if ($notifNoLeidas > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $notifNoLeidas }}</span>@endif
                 </a>
             </li>
+            @if ($puedeFirmar)
+            <li class="nav-item mb-1">
+                <a href="{{ route('firmas.index') }}" class="nav-link {{ request()->routeIs('firmas.*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-signature w-20px"></i>
+                    <span>Firmas y sellos</span>
+                    @if ($firmasPendientes > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $firmasPendientes }}</span>@endif
+                </a>
+            </li>
+            @endif
 
             <li class="nav-item">
                 <button type="button" id="btnMisModulos"

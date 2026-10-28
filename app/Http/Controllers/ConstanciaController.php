@@ -17,33 +17,44 @@ class ConstanciaController extends Controller
 
     public function store(Request $r, int $id)
     {
-        $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
-        $this->svc->crearConstancia($this->actor($r), $c);
+        $d = $r->validate([
+            'modo'         => 'required|in:grupo,individual',
+            'profesores'   => 'required|array|min:1',
+            'profesores.*' => 'integer',
+        ], ['profesores.required' => 'Selecciona al menos un profesor.']);
 
-        return back()->with('ok', 'Constancia generada.');
+        $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
+        $n = $this->svc->crearConstancias($this->actor($r), $c, $d['profesores'], $d['modo'])->count();
+
+        return back()->with('ok', $n === 1 ? 'Constancia generada.' : "$n constancias generadas.");
     }
 
     public function update(Request $r, int $id)
     {
         $data = $r->validate([
-            'Contexto' => 'required|string|min:10|max:1000',
-            'Cierre'   => 'nullable|string|max:1000',
+            'constancias'   => 'required|array|min:1',
+            'constancias.*' => 'integer',
+            'Contexto'      => 'required|string|min:10|max:1000',
+            'Cierre'        => 'nullable|string|max:1000',
         ], [
-            'Contexto.required' => 'El contexto de la constancia es obligatorio.',
-            'Contexto.min'      => 'El contexto debe tener al menos 10 caracteres.',
+            'constancias.required' => 'Selecciona al menos una constancia.',
+            'Contexto.required'    => 'El contexto de la constancia es obligatorio.',
+            'Contexto.min'         => 'El contexto debe tener al menos 10 caracteres.',
         ]);
         $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
-        $this->svc->actualizarConstancia($this->actor($r), $c, $data['Contexto'], $data['Cierre'] ?? null);
+        $n = $this->svc->actualizarConstancias($this->actor($r), $c, $data['constancias'], $data['Contexto'], $data['Cierre'] ?? null);
 
-        return back()->with('ok', 'Constancia actualizada.');
+        return back()->with('ok', $n === 1 ? 'Constancia actualizada.' : "$n constancias actualizadas.");
     }
 
     public function destroy(Request $r, int $id)
     {
+        $data = $r->validate(['constancias' => 'required|array|min:1', 'constancias.*' => 'integer'],
+            ['constancias.required' => 'Selecciona al menos una constancia.']);
         $c = $this->svc->visibles($this->actor($r))->findOrFail($id);
-        $this->svc->eliminarConstancia($this->actor($r), $c);
+        $n = $this->svc->eliminarConstancias($this->actor($r), $c, $data['constancias']);
 
-        return back()->with('ok', 'Constancia eliminada.');
+        return back()->with('ok', $n === 1 ? 'Constancia eliminada.' : "$n constancias eliminadas.");
     }
 
     public function pdf(Request $r, int $id)

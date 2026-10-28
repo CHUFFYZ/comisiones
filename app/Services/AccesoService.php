@@ -132,6 +132,15 @@ class AccesoService
         return $n->filter(fn ($x) => in_array($x->modulo?->Clave, $mods, true))->values();
     }
 
+    public function puedeFirmar(?Usuario $u): bool
+    {
+        return $u && in_array($u->Rol, ['Director', 'SecretariaAcademica'], true);
+    }
+
+    public function puedeFirmarComoDirector(?Usuario $u): bool
+    {
+        return $u && $u->Rol === 'SecretariaAcademica' && (bool) ($u->facultad?->SAFirmaComoDirector);
+    }
     /* ───────── internos ───────── */
 
     private function idModulo(string $clave): ?int

@@ -38,17 +38,21 @@
         {{-- Conversación --}}
         <div class="col-md-8 col-xl-9 h-100 chat-conversation" id="chatConversation">
             <div class="card h-100">
-                <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2" id="chatCabecera">
-                    <span class="fw-semibold">Selecciona una conversación</span>
-                    <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
-                        <i class="fa-solid fa-xmark me-1"></i> Cerrar
-                    </button>
+                <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2 chat-cabecera" id="chatCabecera">
+                    <span class="fw-semibold text-body-secondary">Selecciona una conversación</span>
                 </div>
                 <div class="chat-mensajes flex-grow-1 p-3 d-flex flex-column gap-2" id="mensajes"></div>
                 <form id="formEnviar" class="p-3 border-top d-none">
+                    <div id="barraContexto" class="barra-contexto d-none">
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold" id="ctxTitulo"></div>
+                            <div class="text-truncate" id="ctxTexto"></div>
+                        </div>
+                        <button type="button" class="btn-icono" id="ctxCancelar" aria-label="Cancelar" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
                     <div class="input-group">
                         <input type="text" id="texto" class="form-control" maxlength="2000" placeholder="Escribe un mensaje…" autocomplete="off">
-                        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-paper-plane"></i></button>
+                        <button class="btn btn-primary" type="submit" aria-label="Enviar"><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
                 </form>
                 <div id="soloLectura" class="p-3 border-top small text-body-secondary d-none"></div>
@@ -76,6 +80,7 @@
         abrir: @json(route('chat.abrir')),
         perfil: @json(route('chat.perfil', '__ID__')),
         mensajes: @json(route('chat.mensajes', '__ID__')),
+        editar: @json(route('chat.editar', ['id' => '__ID__', 'mensaje' => '__MSG__'])),
         eliminar: @json(route('chat.eliminar', '__ID__')),
         supMsg: @json(route('chat.supervision.mensajes', '__ID__')),
     };
@@ -89,7 +94,8 @@
     const badgeRol = r => r ? `<span class="badge rounded-pill bg-primary-subtle text-primary-emphasis text-xs">${esc(r)}</span>` : '';
     const badgeFac = f => f ? `<span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis text-xs">${esc(f)}</span>` : '';
 
-    let modo = 'mios', activa = null, ultimaFirma = '', usuarios = null;
+    let modo = 'mios', activa = null, ultimaFirma = '', ultimaCab = '', usuarios = null;
+    let mensajesActuales = [], contactoActual = null, respondiendo = null, editando = null;
 
     async function api(url, opciones = {}) {
         const r = await fetch(url, {
@@ -101,6 +107,7 @@
         return d;
     }
 
+    /* ───────── lista ───────── */
     async function cargarLista() {
         try {
             const items = await api(modo === 'mios' ? RUTAS.lista : RUTAS.sup);
@@ -120,60 +127,100 @@
         } catch (e) {}
     }
 
-    function cabecera(c) {
+    /* ───────── cabecera: volver (móvil) · info · menú ⋮ · cerrar (escritorio) ───────── */
+    const BTN_VOLVER = `<button type="button" class="btn-icono d-md-none" data-cerrar aria-label="Volver a la lista" title="Volver"><i class="fa-solid fa-arrow-left"></i></button>`;
+    const BTN_CERRAR = `<button type="button" class="btn-icono d-none d-md-inline-flex" data-cerrar aria-label="Cerrar conversación" title="Cerrar conversación"><i class="fa-solid fa-xmark"></i></button>`;
+    // Aquí se irán agregando más opciones en el futuro
+    const MENU = `<div class="dropdown">
+        <button type="button" class="btn-icono" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones" title="Más opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+            <li><button type="button" class="dropdown-item small text-danger" data-eliminar><i class="fa-solid fa-trash w-20px"></i> Eliminar chat</button></li>
+        </ul></div>`;
+
+    function pintarCabecera(inner, conMenu) {
+        $('chatCabecera').innerHTML = BTN_VOLVER + inner +
+            `<div class="ms-auto d-flex align-items-center gap-1">${conMenu ? MENU : ''}${BTN_CERRAR}</div>`;
+    }
+    function cabeceraContacto(c) {
         if (!c) return;
-        $('chatCabecera').innerHTML = `
+        const firma = JSON.stringify(c);
+        if (firma === ultimaCab) return;     // evita cerrar el menú abierto en cada refresco
+        ultimaCab = firma;
+        pintarCabecera(`
             <button type="button" class="btn p-0 border-0 bg-transparent" ${c.id ? `data-perfil="${c.id}"` : 'disabled'}>${avatar(c.foto, c.nombre, 'chat-avatar--lg')}</button>
-            <div class="lh-sm">
-                <div class="fw-semibold">${esc(c.nombre)} ${badgeRol(c.rol)} ${badgeFac(c.facultad)}</div>
+            <div class="lh-sm min-w-0">
+                <div class="fw-semibold text-truncate">${esc(c.nombre)} ${badgeRol(c.rol)} ${badgeFac(c.facultad)}</div>
                 ${c.anonimo ? '' : `<small class="${c.enLinea ? 'text-success' : 'text-body-secondary'}">${
                     c.enLinea ? '● En línea' : (c.conexion ? 'Últ. conexión: ' + esc(c.conexion) : 'Sin conexión registrada')}</small>`}
-            </div>
-            <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
-                <i class="fa-solid fa-xmark me-1"></i> Cerrar
-            </button>`;
+            </div>`, true);
+    }
+
+    function cerrarConversacion() {
+        activa = null; ultimaFirma = ''; ultimaCab = ''; mensajesActuales = []; contactoActual = null;
+        cancelarContexto();
+        $('mensajes').innerHTML = '';
+        $('chatCabecera').innerHTML = '<span class="fw-semibold text-body-secondary">Selecciona una conversación</span>';
+        $('chatWrap').classList.remove('conversacion-abierta');
+        $('formEnviar').classList.add('d-none'); $('soloLectura').classList.add('d-none');
+        cargarLista();
     }
 
     async function abrirConversacion(id, titulo) {
-        activa = id; ultimaFirma = '';
+        activa = id; ultimaFirma = ''; ultimaCab = '';
+        cancelarContexto();
         $('chatWrap').classList.add('conversacion-abierta');
-        $('chatCabecera').innerHTML = `<span class="fw-semibold">${esc(titulo)}</span>
-            <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
-                <i class="fa-solid fa-xmark me-1"></i> Cerrar
-            </button>`;
+        pintarCabecera(`<span class="fw-semibold">${esc(titulo)}</span>`, modo === 'mios');
         $('mensajes').innerHTML = '';
         await cargarMensajes(true);
         cargarLista();
     }
 
-    $('chatCabecera').addEventListener('click', e => {
-        if (e.target.closest('#btnCerrarConversacion')) $('chatWrap').classList.remove('conversacion-abierta');
+    $('chatCabecera').addEventListener('click', async e => {
+        if (e.target.closest('[data-cerrar]')) return cerrarConversacion();
+        if (!e.target.closest('[data-eliminar]') || !activa) return;
+        if (!await confirmar('Esta conversación se quitará de tu lista. La otra persona seguirá viéndola.', 'Eliminar chat', 'Eliminar')) return;
+        try {
+            await api(RUTAS.eliminar.replace('__ID__', activa), { method: 'DELETE' });
+            cerrarConversacion(); showToast('Chat eliminado de tu lista.');
+        } catch (err) { showToast(err.message, 'error'); }
     });
 
+    /* ───────── mensajes ───────── */
     async function cargarMensajes(forzar) {
         if (!activa) return;
         try {
-            const base = (modo === 'mios' ? RUTAS.mensajes : RUTAS.supMsg).replace('__ID__', activa);
-            const d = await api(base);
+            const d = await api((modo === 'mios' ? RUTAS.mensajes : RUTAS.supMsg).replace('__ID__', activa));
             const caja = $('mensajes');
             const alFinal = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 80;
             const firma = JSON.stringify(d.mensajes);
+            mensajesActuales = d.mensajes;
+            contactoActual = d.contacto;
 
             if (firma !== ultimaFirma) {
                 ultimaFirma = firma;
                 caja.innerHTML = '';
                 d.mensajes.forEach(m => {
-                    const div = document.createElement('div');
-                    div.className = 'burbuja ' + (m.mio ? 'mia align-self-end' : 'otra align-self-start');
+                    const fila = document.createElement('div');
+                    fila.className = 'msg-fila ' + (m.mio ? 'fila-mia' : 'fila-otra');
+                    fila.dataset.id = m.id;
                     const estado = m.mio ? (m.leido
                         ? ' <span class="visto"><i class="fa-solid fa-check-double"></i> Visto</span>'
                         : ' <i class="fa-solid fa-check"></i>') : '';
-                    div.innerHTML = (m.autor ? `<strong>${esc(m.autor)}</strong><br>` : '') + esc(m.texto) + `<small>${esc(m.fecha)}${estado}</small>`;
-                    caja.appendChild(div);
+                    const cita = m.respuesta
+                        ? `<div class="cita" data-ir="${m.respuesta.id}"><strong>${esc(m.respuesta.autor)}</strong><span>${esc(m.respuesta.texto)}</span></div>` : '';
+                    // Sin saltos de línea dentro de la burbuja (usa white-space: pre-wrap)
+                    const burbuja = `<div class="burbuja ${m.mio ? 'mia' : 'otra'}">` + (m.autor ? `<strong>${esc(m.autor)}</strong><br>` : '') + cita + esc(m.texto)
+                        + `<small>${esc(m.fecha)}${m.editado ? ' · editado' : ''}${estado}</small></div>`;
+                    const acciones = modo === 'mios' ? `<div class="msg-acciones">`
+                        + (d.puedeResponder ? `<button type="button" data-responder="${m.id}" title="Responder" aria-label="Responder"><i class="fa-solid fa-reply"></i></button>` : '')
+                        + (m.puedeEditar ? `<button type="button" data-editar="${m.id}" title="Editar (hasta 15 min después de enviarlo)" aria-label="Editar"><i class="fa-solid fa-pen"></i></button>` : '')
+                        + `</div>` : '';
+                    fila.innerHTML = burbuja + acciones;
+                    caja.appendChild(fila);
                 });
                 if (forzar || alFinal) caja.scrollTop = caja.scrollHeight;
             }
-            if (modo === 'mios') { cabecera(d.contacto); botonEliminar(); }
+            if (modo === 'mios') cabeceraContacto(d.contacto);
 
             const puede = modo === 'mios' && d.puedeResponder;
             $('formEnviar').classList.toggle('d-none', !puede);
@@ -182,30 +229,62 @@
         } catch (e) {}
     }
 
-    // Eliminar chat (borrado lógico: solo se oculta para mí)
-    function botonEliminar() {
-        if (!activa || modo !== 'mios') return;
-        const b = document.createElement('button');
-        b.type = 'button'; b.className = 'btn btn-ghost is-danger btn-sm ms-auto';
-        b.dataset.eliminar = '1'; b.title = 'Eliminar chat';
-        b.innerHTML = '<i class="fa-solid fa-trash"></i>';
-        $('chatCabecera').appendChild(b);
+    /* ───────── responder / editar ───────── */
+    function mostrarContexto(titulo, texto) {
+        $('ctxTitulo').textContent = titulo; $('ctxTexto').textContent = texto;
+        $('barraContexto').classList.remove('d-none'); $('texto').focus();
     }
-    $('chatCabecera').addEventListener('click', async e => {
-        if (!e.target.closest('[data-eliminar]') || !activa) return;
-        if (!await confirmar('Esta conversación se quitará de tu lista. La otra persona seguirá viéndola.', 'Eliminar chat', 'Eliminar')) return;
+    function cancelarContexto() {
+        if (editando) $('texto').value = '';
+        respondiendo = null; editando = null;
+        $('barraContexto').classList.add('d-none');
+    }
+    function iniciarRespuesta(id) {
+        const m = mensajesActuales.find(x => x.id === id); if (!m) return;
+        cancelarContexto();
+        respondiendo = { id };
+        mostrarContexto('Respondiendo a ' + (m.mio ? 'tu mensaje' : (contactoActual?.nombre || 'mensaje')), m.texto);
+    }
+    function iniciarEdicion(id) {
+        const m = mensajesActuales.find(x => x.id === id); if (!m || !m.puedeEditar) return;
+        cancelarContexto();
+        editando = { id };
+        $('texto').value = m.texto;
+        mostrarContexto('Editando mensaje', m.texto);
+    }
+    $('ctxCancelar').addEventListener('click', cancelarContexto);
+
+    $('mensajes').addEventListener('click', e => {
+        const r = e.target.closest('[data-responder]'), ed = e.target.closest('[data-editar]'), ir = e.target.closest('[data-ir]');
+        if (r) iniciarRespuesta(Number(r.dataset.responder));
+        else if (ed) iniciarEdicion(Number(ed.dataset.editar));
+        else if (ir) {
+            const el = $('mensajes').querySelector(`[data-id="${ir.dataset.ir}"]`);
+            if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('resaltado'); setTimeout(() => el.classList.remove('resaltado'), 1500); }
+        }
+    });
+
+    $('formEnviar').addEventListener('submit', async e => {
+        e.preventDefault();
+        const t = $('texto').value.trim();
+        if (!t || !activa) return;
         try {
-            await api(RUTAS.eliminar.replace('__ID__', activa), { method: 'DELETE' });
-            activa = null; ultimaFirma = '';
-            $('mensajes').innerHTML = '';
-            $('chatCabecera').innerHTML = `<span class="fw-semibold">Selecciona una conversación</span>
-                <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
-                    <i class="fa-solid fa-xmark me-1"></i> Cerrar
-                </button>`;
-            $('chatWrap').classList.remove('conversacion-abierta');
-            $('formEnviar').classList.add('d-none'); $('soloLectura').classList.add('d-none');
-            cargarLista(); showToast('Chat eliminado de tu lista.');
-        } catch (err) { showToast(err.message, 'error'); }
+            if (editando) {
+                await api(RUTAS.editar.replace('__ID__', activa).replace('__MSG__', editando.id), { method: 'PATCH', body: JSON.stringify({ Mensaje: t }) });
+            } else {
+                await api(RUTAS.mensajes.replace('__ID__', activa), { method: 'POST', body: JSON.stringify({ Mensaje: t, IdRespuesta: respondiendo?.id ?? null }) });
+            }
+            $('texto').value = ''; respondiendo = null; editando = null; $('barraContexto').classList.add('d-none');
+            await cargarMensajes(true); cargarLista();
+        } catch (err) {
+            showToast(err.message, 'error');
+            if (editando) cancelarContexto();   // p. ej. ya pasaron los 15 minutos
+        }
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape' || !activa || document.querySelector('.modal.show')) return;
+        if (respondiendo || editando) cancelarContexto(); else cerrarConversacion();
     });
 
     $('lista').addEventListener('click', e => {
@@ -214,19 +293,7 @@
         if (el) abrirConversacion(Number(el.dataset.id), el.dataset.titulo);
     });
 
-    $('formEnviar').addEventListener('submit', async e => {
-        e.preventDefault();
-        const t = $('texto').value.trim();
-        if (!t || !activa) return;
-        $('texto').value = '';
-        try {
-            await api(RUTAS.mensajes.replace('__ID__', activa), { method: 'POST', body: JSON.stringify({ Mensaje: t }) });
-            await cargarMensajes(true);
-            cargarLista();
-        } catch (err) { showToast(err.message, 'error'); }
-    });
-
-    // Perfil (clic en cualquier foto)
+    /* ───────── perfil ───────── */
     document.addEventListener('click', async e => {
         const b = e.target.closest('[data-perfil]');
         if (!b) return;
@@ -247,7 +314,7 @@
         } catch (err) { showToast(err.message, 'error'); }
     });
 
-    // Nuevo chat: botón que despliega usuarios por facultad y rol
+    /* ───────── nuevo chat ───────── */
     function pintarArbol() {
         const q = $('buscaUsuario').value.trim().toLowerCase();
         const lista = (usuarios || []).filter(u => !q || `${u.nombre} ${u.rol} ${u.facultad ?? ''}`.toLowerCase().includes(q));
@@ -299,19 +366,13 @@
         } catch (err) { showToast(err.message, 'error'); }
     });
 
-    // Pestañas del superusuario
+    /* ───────── pestañas del superusuario ───────── */
     function cambiarModo(m) {
-        modo = m; activa = null;
+        modo = m;
         $('tabMios')?.classList.toggle('active', m === 'mios');
         $('tabSup')?.classList.toggle('active', m === 'sup');
         $('btnNuevo').classList.toggle('d-none', m === 'sup');
-        $('mensajes').innerHTML = ''; $('chatCabecera').innerHTML = `<span class="fw-semibold">Selecciona una conversación</span>
-            <button type="button" id="btnCerrarConversacion" class="btn btn-secondary btn-sm ms-auto" aria-label="Cerrar conversación">
-                <i class="fa-solid fa-xmark me-1"></i> Cerrar
-            </button>`;
-        $('chatWrap').classList.remove('conversacion-abierta');
-        $('formEnviar').classList.add('d-none'); $('soloLectura').classList.add('d-none');
-        cargarLista();
+        cerrarConversacion();
     }
     $('tabMios')?.addEventListener('click', () => cambiarModo('mios'));
     $('tabSup')?.addEventListener('click', () => cambiarModo('sup'));

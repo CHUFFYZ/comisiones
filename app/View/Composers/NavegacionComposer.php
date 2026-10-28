@@ -10,6 +10,8 @@ use App\Models\Notificacion;
 use App\Models\Usuario;
 use App\Services\AccesoService;
 use Illuminate\View\View;
+use App\Models\Comision;
+use App\Models\Constancia;
 
 class NavegacionComposer
 {
@@ -44,9 +46,18 @@ class NavegacionComposer
             'simulado'        => null,
             'secretariasSim'  => collect(),
             'puedeGestion'    => false,
+            'puedeFirmar' => false, 'firmasPendientes' => 0,
         ];
 
         if ($user) {
+            if ($this->acceso->puedeFirmar($user)) {
+            $falta = fn ($q) => $q->whereNull('FirmaAt')->orWhereNull('SelloAt');
+            $data['puedeFirmar'] = true;
+            $data['firmasPendientes'] =
+                Comision::where('IdFacultad', $user->IdFacultad)->whereNull('DeletedAt')->where($falta)->count()
+                + Constancia::where('Activo', 1)->where($falta)
+                    ->whereHas('comision', fn ($q) => $q->where('IdFacultad', $user->IdFacultad)->whereNull('DeletedAt'))->count();
+}
             $data['puedeGestion'] = $this->acceso->puedeGestionarUsuarios($user);
             if ($this->acceso->esSuperUsuario($user)) {
                 $data['puedeSimular']   = true;

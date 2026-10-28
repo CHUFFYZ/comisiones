@@ -69,15 +69,21 @@ class ProfesorController extends Controller
     }
 
     /** $doc: oficio | constancia · $formato: vista (HTML) | pdf */
-    public function documento(Request $r, int $id, string $doc, string $formato)
+    public function oficio(Request $r, int $id, string $formato)
     {
         $c = $this->mia($r, $id)->load('facultad');
-        $k = $doc === 'constancia' ? $c->constancia : null;
-        abort_if($doc === 'constancia' && !$k, 404, 'Aún no hay constancia.');
 
-        return $formato === 'pdf'
-            ? $this->docs->respuestaPdf($c, $k)
-            : response($this->docs->html($c, $k));
+        return $formato === 'pdf' ? $this->docs->respuestaPdf($c) : response($this->docs->html($c));
+    }
+
+    /** Solo las constancias en las que el profesor participa. */
+    public function constancia(Request $r, int $id, int $k, string $formato)
+    {
+        $c = $this->mia($r, $id)->load('facultad');
+        $const = $c->constancias->first(fn ($x) => (int) $x->Id === $k && $x->profesores->contains('Id', $r->user()->Id));
+        abort_unless($const, 404, 'No tienes esa constancia.');
+
+        return $formato === 'pdf' ? $this->docs->respuestaPdf($c, $const) : response($this->docs->html($c, $const));
     }
 
     private function mia(Request $r, int $id): Comision

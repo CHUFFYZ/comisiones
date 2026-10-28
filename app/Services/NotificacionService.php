@@ -69,12 +69,25 @@ class NotificacionService
         }
     }
 
-    public function constancia(Comision $c, Usuario $actor, string $accion): void
+    public function constancia(Comision $c, Usuario $actor, string $accion, ?iterable $ids = null): void
     {
-        $this->enviar($this->profesores($c)->reject(fn ($id) => (int) $id === (int) $actor->Id),
+        $dest = $ids !== null ? collect($ids) : $this->profesores($c);
+        $this->enviar($dest->reject(fn ($id) => (int) $id === (int) $actor->Id),
             'constancia', "Constancia {$accion}", "Comisión {$c->NOficio}", route('profesor.show', $c->Id));
     }
 
+    public function porFirmar(Comision $c, string $que): void
+    {
+        $ids = Usuario::deRol(['Director', 'SecretariaAcademica'])->where('Activo', 1)
+            ->where('IdFacultad', $c->IdFacultad)->pluck('Id');
+        $this->enviar($ids, 'firma', "{$que} por firmar", "{$c->NOficio}: {$c->Asunto}", route('firmas.index'));
+    }
+
+    public function firmado(Comision $c, Usuario $actor, string $titulo): void
+    {
+        $this->enviar($this->secretaria($c)->reject(fn ($id) => (int) $id === (int) $actor->Id),
+            'firma', $titulo, "{$c->NOficio}: {$c->Asunto}", route('comisiones.show', $c->Id));
+    }
     /** Avisa de comisiones por vencer (≤ 2 días) o vencidas sin finalizar. Una vez por comisión/fecha. */
     public function vencimientos(): void
     {

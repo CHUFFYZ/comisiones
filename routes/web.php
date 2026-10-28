@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Admin\FacultadController;
 use App\Http\Controllers\Admin\PermisoController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ComisionController;
 use App\Http\Controllers\ConstanciaController;
+use App\Http\Controllers\FirmaController;
 use App\Http\Controllers\ModuloController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\PerfilController;
@@ -26,6 +28,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/perfil', [PerfilController::class, 'index'])->name('perfil');
     Route::post('/perfil/foto', [PerfilController::class, 'foto'])->name('perfil.foto');
     Route::delete('/perfil/foto', [PerfilController::class, 'quitarFoto'])->name('perfil.foto.quitar');
+    Route::post('/perfil/firma', [PerfilController::class, 'firmaSello'])->name('perfil.firma');
+
+    Route::prefix('firmas')->name('firmas.')->group(function () {
+        Route::get('/', [FirmaController::class, 'index'])->name('index');
+        Route::post('/', [FirmaController::class, 'procesar'])->name('procesar');
+        Route::get('/{tipo}/{id}/pdf', [FirmaController::class, 'pdf'])
+            ->where(['tipo' => 'c|k', 'id' => '[0-9]+'])->name('pdf');
+    });
 
     Route::post('/simulacion', [SimulacionController::class, 'iniciar'])->name('simulacion.iniciar');
     Route::delete('/simulacion', [SimulacionController::class, 'terminar'])->name('simulacion.terminar');
@@ -71,6 +81,8 @@ Route::middleware('auth')->group(function () {
         Route::get('plantillas/{id}/editar',   [$p, 'edit'])->name('plantillas.edit');
         Route::put('plantillas/{id}',          [$p, 'update'])->name('plantillas.update');
         Route::patch('plantillas/{id}/estado', [$p, 'estado'])->name('plantillas.estado');
+        Route::get('facultades', [FacultadController::class, 'index'])->name('facultades.index');
+        Route::patch('facultades/{id}/firma-director', [FacultadController::class, 'firmaDirector'])->name('facultades.firma');
     });
 
     Route::get('/modulos', [ModuloController::class, 'index'])->name('modulos.index');
@@ -119,12 +131,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/reporte',          [ProfesorController::class, 'reporte'])->name('reporte');
         Route::get('/{id}/reporte',           [ProfesorController::class, 'descargarReporte'])->name('reporte.descargar');
         Route::patch('/{id}/refutar',         [ProfesorController::class, 'refutar'])->name('refutar');
-        Route::get('/{id}/{doc}/{formato}',   [ProfesorController::class, 'documento'])
-            ->where(['doc' => 'oficio|constancia', 'formato' => 'vista|pdf'])->name('documento');
+        Route::get('/{id}/oficio/{formato}', [ProfesorController::class, 'oficio'])
+            ->where('formato', 'vista|pdf')->name('oficio');
+        Route::get('/{id}/constancia/{k}/{formato}', [ProfesorController::class, 'constancia'])
+            ->where(['k' => '[0-9]+', 'formato' => 'vista|pdf'])->name('constancia');
     });
 
     /* ── Chat ── */
     Route::prefix('chat')->name('chat.')->group(function () {
+        Route::patch('/{id}/mensajes/{mensaje}', [ChatController::class, 'editar'])
+            ->whereNumber(['id', 'mensaje'])->name('editar');
         Route::delete('/{id}', [ChatController::class, 'eliminar'])->whereNumber('id')->name('eliminar');
         Route::get('/',                          [ChatController::class, 'index'])->name('index');
         Route::get('/usuarios',                  [ChatController::class, 'usuarios'])->name('usuarios');

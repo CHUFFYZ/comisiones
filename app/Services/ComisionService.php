@@ -23,6 +23,7 @@ class ComisionService
         private AccesoService $acceso,
         private DocumentoService $docs,
         private NotificacionService $notif,
+        private FirmaService $firmas,
     ) {}
 
     /* ───────── alcance / consultas ───────── */
@@ -64,7 +65,7 @@ class ComisionService
     /** $anuladas: false = vigentes, true = anuladas, null = ambas */
     public function visibles(Usuario $u, ?bool $anuladas = false): Builder
     {
-        $q = $this->alcance($u)->with(['tipo', 'estado', 'profesores', 'constancia']);
+        $q = $this->alcance($u)->with(['tipo', 'estado', 'profesores', 'constancias.profesores']);
 
         if ($anuladas === true)  $q->whereNotNull('DeletedAt');
         if ($anuladas === false) $q->whereNull('DeletedAt');
@@ -77,7 +78,7 @@ class ComisionService
     {
         return Comision::query()->whereNull('DeletedAt')
             ->whereHas('profesores', fn ($q) => $q->where('usuario.Id', $u->Id))
-            ->with(['tipo', 'estado', 'profesores', 'constancia', 'facultad'])
+            ->with(['tipo', 'estado', 'profesores', 'constancias.profesores', 'facultad'])
             ->orderByDesc('Id');
     }
 
@@ -115,6 +116,7 @@ class ComisionService
         $c->load(['facultad', 'tipo', 'profesores', 'plantilla']);
         $this->docs->guardarOficio($c);
         $this->notif->asignacion($c, $c->profesores->pluck('Id'));
+        $this->notif->porFirmar($c, 'Oficio');
 
         return $c;
     }
@@ -122,8 +124,9 @@ class ComisionService
     public function actualizar(Usuario $u, Comision $c, array $d): Comision
     {
         $antes = $c->profesores()->pluck('usuario.Id')->map(fn ($i) => (int) $i);
+        $teniaFirma = $c->firmado || $c->sellado;
 
-        DB::transaction(function () use ($u, $c, $d) {
+        DB::transaction(function () use ($u, $c, $d, $teniaFirma) {
             $c->update([
                 'IdTipoComision' => $d['IdTipoComision'],
                 'IdPlantilla'    => $d['IdPlantilla'],
@@ -133,17 +136,20 @@ class ComisionService
                 'FechaInicio'    => $d['FechaInicio'],
                 'FechaFin'       => $d['FechaFin'] ?? null,
                 'UpdatedBy'      => $u->Matricula,
+                ...($teniaFirma ? $this->firmas->limpio($c->IdFacultad) : []),
             ]);
             $c->profesores()->sync($d['profesores']);
             $this->log($c, $u, 'Comisión modificada');
         });
 
-        $c = $c->fresh(['facultad', 'tipo', 'profesores', 'plantilla', 'constancia']);
-
-        // Se reescriben los archivos guardados (oficio y, si existe, constancia)
+        $c = $c->fresh(['facultad', 'tipo', 'profesores', 'plantilla', 'constancias.profesores']);
         $this->docs->guardarOficio($c);
-        if ($c->constancia) {
-            $this->docs->guardarConstancia($c, $c->constancia);
+        foreach ($c->constancias as $k) {
+            $this->docs->guardarConstancia($c, $k);
+        }
+        if ($teniaFirma) {
+            $this->log($c, $u, 'Firma retirada por modificación');
+            $this->notif->porFirmar($c, 'Oficio');
         }
 
         $nuevos = collect($d['profesores'])->map(fn ($i) => (int) $i)->diff($antes);
@@ -242,7 +248,10 @@ class ComisionService
     /** Profesor: refuta la constancia con descripción → Refutado. */
     public function refutarConstancia(Usuario $u, Comision $c, string $motivo): void
     {
-        abort_unless((int) $c->IdEstado === 3 && $c->constancia, 422, 'No hay una constancia que refutar.');
+        abort_unless(
+            (int) $c->IdEstado === 3 && $c->constancias->contains(fn ($k) => $k->profesores->contains('Id', $u->Id)),
+            422, 'No hay una constancia tuya que refutar.'
+        );
         $this->cambiar($c, $u, 5, 'Constancia refutada', $motivo);
     }
 
@@ -279,76 +288,99 @@ class ComisionService
 
     /* ───────── constancias ───────── */
 
-    public function crearConstancia(Usuario $u, Comision $c): Constancia
+    /** $modo: grupo = una constancia con todos los elegidos · individual = una por profesor. */
+    public function crearConstancias(Usuario $u, Comision $c, array $ids, string $modo): Collection
     {
         abort_unless((int) $c->IdEstado === 3, 422, 'La comisión debe estar finalizada.');
+        $c->loadMissing(['profesores', 'constancias.profesores', 'facultad']);
 
-        if ($c->constancia) {
-            return $c->constancia;
+        $pendientes = $c->profesores->pluck('Id')->map(fn ($i) => (int) $i)->diff($c->profesores_cubiertos);
+        $ids = collect($ids)->map(fn ($i) => (int) $i)->unique()->intersect($pendientes)->values();
+
+        if ($ids->isEmpty()) {
+            throw ValidationException::withMessages(['general' => 'Selecciona al menos un profesor que aún no tenga constancia.']);
         }
 
-        $plantilla = PlantillaDocumento::where('TipoDocumento', 'Constancia')
-            ->where('Activo', 1)->latest('Id')->firstOrFail();
+        $plantilla = PlantillaDocumento::where('TipoDocumento', 'Constancia')->where('Activo', 1)->latest('Id')->firstOrFail();
+        $snap      = $this->snapshots($u, $c->IdFacultad);
+        $grupos    = $modo === 'grupo' ? [$ids->all()] : $ids->map(fn ($i) => [$i])->all();
 
-        $k = Constancia::create([
-            'IdComision'       => $c->Id,
-            'IdPlantilla'      => $plantilla->Id,
-            'Contexto'         => $c->Contexto,
-            'Cierre'           => $plantilla->Cierre,
-            'FechaElaboracion' => now(),
-            ...$this->snapshots($u, $c->IdFacultad),
-            'Activo'           => 1,
-            'CreatedAt'        => now(),
-            'CreatedBy'        => $u->Matricula,
-        ]);
+        $creadas = DB::transaction(fn () => collect($grupos)->map(function ($g) use ($c, $plantilla, $snap, $u) {
+            $k = Constancia::create([
+                'IdComision'       => $c->Id,
+                'IdPlantilla'      => $plantilla->Id,
+                'Contexto'         => $c->Contexto,
+                'Cierre'           => $plantilla->Cierre,
+                'FechaElaboracion' => now(),
+                ...$snap,
+                'Activo'           => 1,
+                'CreatedAt'        => now(),
+                'CreatedBy'        => $u->Matricula,
+            ]);
+            $k->profesores()->sync($g);
+            return $k;
+        }));
 
-        $c->loadMissing('facultad');
-        $this->docs->guardarConstancia($c, $k);
-        $this->log($c, $u, 'Constancia generada');
-        $this->notif->constancia($c, $u, 'generada');
+        foreach ($creadas as $k) {
+            $this->docs->guardarConstancia($c, $k->load('profesores'));
+        }
+        $c->unsetRelation('constancias');
 
-        return $k;
+        $nombres = $c->profesores->whereIn('Id', $ids->all())->map(fn ($p) => $p->nombre_corto)->join(', ');
+        $this->log($c, $u, 'Constancia generada', ($modo === 'grupo' ? 'Grupal' : 'Individual') . ": $nombres");
+        $this->notif->constancia($c, $u, 'generada', $ids);
+        $this->notif->porFirmar($c, 'Constancia');
+
+        return $creadas;
     }
 
-    /** Modifica el texto y reescribe el PDF guardado. Si estaba refutada, vuelve a Finalizado. */
-    public function actualizarConstancia(Usuario $u, Comision $c, string $contexto, ?string $cierre = null): Constancia
+    /** Modifica las constancias seleccionadas (ids de constancia). */
+    public function actualizarConstancias(Usuario $u, Comision $c, array $ids, string $contexto, ?string $cierre = null): int
     {
-        $k = $c->constancia;
-        abort_unless($k, 404, 'La comisión no tiene constancia.');
+        $c->loadMissing(['facultad', 'constancias.profesores']);
+        $ks = $c->constancias->whereIn('Id', array_map('intval', $ids));
+        abort_if($ks->isEmpty(), 404, 'No se encontraron las constancias seleccionadas.');
 
-        $k->update([
-            'Contexto' => $contexto,
-            'Cierre'   => ($cierre !== null && trim($cierre) !== '') ? $cierre : $k->Cierre,
-            'FechaElaboracion' => now(),
-            'UpdatedBy' => $u->Matricula,
-        ]);
-        $c->loadMissing('facultad');
-        $this->docs->guardarConstancia($c, $k->fresh());
+        foreach ($ks as $k) {
+            $k->update([
+                'Contexto'         => $contexto,
+                'Cierre'           => ($cierre !== null && trim($cierre) !== '') ? $cierre : $k->Cierre,
+                'FechaElaboracion' => now(),
+                'UpdatedBy'        => $u->Matricula,
+                ...$this->firmas->limpio($c->IdFacultad),   // al cambiar el texto hay que volver a firmar
+            ]);
+            $this->docs->guardarConstancia($c, $k->fresh('profesores'));
+        }
 
         if ((int) $c->IdEstado === 5) {
             $this->cambiar($c, $u, 3, 'Constancia corregida');
         } else {
-            $this->log($c, $u, 'Constancia modificada');
+            $this->log($c, $u, 'Constancia modificada', $ks->count() . ' constancia(s)');
         }
-        $this->notif->constancia($c, $u, 'actualizada');
+        $this->notif->constancia($c, $u, 'actualizada', $ks->flatMap(fn ($k) => $k->profesores->pluck('Id'))->unique());
+        $this->notif->porFirmar($c, 'Constancia');
 
-        return $k;
+        return $ks->count();
     }
 
-    public function eliminarConstancia(Usuario $u, Comision $c): void
+    public function eliminarConstancias(Usuario $u, Comision $c, array $ids): int
     {
-        $k = $c->constancia;
-        abort_unless($k, 404, 'La comisión no tiene constancia.');
+        $c->loadMissing(['facultad', 'constancias.profesores']);
+        $ks = $c->constancias->whereIn('Id', array_map('intval', $ids));
+        abort_if($ks->isEmpty(), 404, 'No se encontraron las constancias seleccionadas.');
 
-        $k->update(['Activo' => 0, 'DeletedAt' => now(), 'DeletedBy' => $u->Matricula]);
-        $c->loadMissing('facultad');
-        $this->docs->borrarConstancia($c);
+        foreach ($ks as $k) {
+            $k->update(['Activo' => 0, 'DeletedAt' => now(), 'DeletedBy' => $u->Matricula]);
+            $this->docs->borrarConstancia($c, $k);
+        }
 
         if ((int) $c->IdEstado === 5) {
             $this->cambiar($c, $u, 3, 'Constancia eliminada');
         } else {
-            $this->log($c, $u, 'Constancia eliminada');
+            $this->log($c, $u, 'Constancia eliminada', $ks->count() . ' constancia(s)');
         }
+
+        return $ks->count();
     }
 
     /* ───────── estadísticas del módulo ───────── */
@@ -374,7 +406,13 @@ class ComisionService
             return ['label' => self::MESES[$m->month - 1] . ' ' . $m->format('y'), 'n' => (int) ($porMes[$m->format('Y-m')] ?? 0)];
         });
 
-        $sinConstancia = $vig()->where('IdEstado', 3)->whereDoesntHave('constancia');
+        $sinConstancia = $vig()->where('IdEstado', 3)->whereHas('profesores', fn ($p) => $p->whereNotExists(
+            fn ($q) => $q->select(DB::raw(1))->from('constancia_profesor as cp')
+                ->join('constancia as k', 'k.Id', '=', 'cp.IdConstancia')
+                ->whereColumn('cp.IdUsuario', 'usuario.Id')
+                ->whereColumn('k.IdComision', 'comision.Id')
+                ->where('k.Activo', 1)
+        ));
         $porVencer = $vig()->where('IdEstado', '<', 3)->whereNotNull('FechaFin')
             ->whereDate('FechaFin', '<=', now()->addDays(3)->toDateString());
 
@@ -413,8 +451,8 @@ class ComisionService
         return [
             'DirectorNombre'   => $dir ? $this->docs->nombreConGrado($dir) : '',
             'DirectorCargo'    => $dir && (int) $dir->Genero === 1 ? 'Directora' : 'Director',
-            'DirectorFirmaUrl' => $dir?->FirmaUrl,
-            'DirectorSelloUrl' => $dir?->SelloUrl,
+            'DirectorFirmaUrl' => null,
+            'DirectorSelloUrl' => null,
             'FirmaElaboracion' => 'C.c.p. Archivo ' . $u->facultad->Clave . '/' . $ini,
         ];
     }

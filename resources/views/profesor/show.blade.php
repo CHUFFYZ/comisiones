@@ -3,6 +3,8 @@
 @section('title', $c->NOficio . ' · Mis comisiones')
 
 @section('content')
+@php $misConst = $c->constancias->filter(fn ($k) => $k->profesores->contains('Id', auth()->id())); @endphp
+@php($constancias = $c->constancias->filter(fn ($k) => $k->profesores->contains('Id', auth()->user()->Id)))
 <div class="container-fluid p-0">
     <div class="mb-3">
         <a href="{{ route('profesor.panel') }}" class="small"><i class="fa-solid fa-arrow-left me-1"></i> Mis comisiones</a>
@@ -81,18 +83,27 @@
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tabOficio">
-                        <a href="{{ route('profesor.documento', [$c->Id, 'oficio', 'pdf']) }}" target="_blank" class="btn btn-ghost is-brand btn-sm mb-3"><i class="fa-solid fa-file-pdf me-1"></i> Oficio PDF</a>
-                        <iframe class="doc-frame" src="{{ route('profesor.documento', [$c->Id, 'oficio', 'vista']) }}" title="Oficio" loading="lazy"></iframe>
+                        <a href="{{ route('profesor.oficio', [$c->Id, 'pdf']) }}" target="_blank" class="btn btn-ghost is-brand btn-sm mb-3"><i class="fa-solid fa-file-pdf me-1"></i> Oficio PDF</a>
+                        <iframe class="doc-frame" src="{{ route('profesor.oficio', [$c->Id, 'vista']) }}" title="Oficio" loading="lazy"></iframe>
                     </div>
                     <div class="tab-pane fade" id="tabConstancia">
-                        @if ($c->constancia)
-                            <div class="d-flex flex-wrap gap-2 mb-3">
-                                <a href="{{ route('profesor.documento', [$c->Id, 'constancia', 'pdf']) }}" target="_blank" class="btn btn-ghost is-success btn-sm"><i class="fa-solid fa-file-pdf me-1"></i> Constancia PDF</a>
-                                @if ($c->IdEstado == 3)
-                                    <button type="button" class="btn btn-ghost is-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalRefutar"><i class="fa-solid fa-gavel me-1"></i> Refutar constancia</button>
-                                @endif
+                        @if ($misConst->isNotEmpty())
+                            <div class="list-group mb-3">
+                                @foreach ($misConst as $k)
+                                    <div class="list-group-item d-flex flex-wrap align-items-center gap-2 small">
+                                        <div class="flex-grow-1">
+                                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">{{ $k->profesores->count() > 1 ? 'Constancia grupal' : 'Constancia individual' }}</span>
+                                            @include('firmas.partials.estado', ['d' => $k])
+                                        </div>
+                                        <button type="button" class="btn btn-ghost btn-sm" data-ver-const="{{ route('profesor.constancia', [$c->Id, $k->Id, 'vista']) }}"><i class="fa-solid fa-eye me-1"></i> Ver</button>
+                                        <a href="{{ route('profesor.constancia', [$c->Id, $k->Id, 'pdf']) }}" target="_blank" class="btn btn-ghost is-success btn-sm"><i class="fa-solid fa-file-pdf me-1"></i> PDF</a>
+                                    </div>
+                                @endforeach
                             </div>
-                            <iframe class="doc-frame" src="{{ route('profesor.documento', [$c->Id, 'constancia', 'vista']) }}" title="Constancia" loading="lazy"></iframe>
+                            @if ($c->IdEstado == 3)
+                                <button type="button" class="btn btn-ghost is-danger btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#modalRefutar"><i class="fa-solid fa-gavel me-1"></i> Refutar constancia</button>
+                            @endif
+                            <iframe id="frameConst" class="doc-frame d-none" title="Constancia"></iframe>
                         @else
                             <div class="text-center py-5 text-body-secondary small">Secretaría aún no genera tu constancia.</div>
                         @endif
@@ -110,7 +121,7 @@
     </div>
 </div>
 
-@if ($c->constancia && $c->IdEstado == 3)
+@if ($misConst->isNotEmpty() && $c->IdEstado == 3)
 <div class="modal fade" id="modalRefutar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" action="{{ route('profesor.refutar', $c->Id) }}" class="modal-content">
@@ -134,4 +145,7 @@
 <script>showToast(@json($errors->first()), 'error');</script>
 @endpush
 @endif
+@push('scripts')
+<script>document.querySelectorAll('[data-ver-const]').forEach(b=>b.addEventListener('click',()=>{const f=document.getElementById('frameConst');f.src=b.dataset.verConst;f.classList.remove('d-none');}));</script>
+@endpush
 @endsection

@@ -24,7 +24,7 @@ class DocumentoService
         $doc  = $k ?? $c;
         $p    = $doc->plantilla;
         $esC  = $k !== null;
-        $profes = $c->profesores->sortBy('Apellido')->values();
+        $profes = ($k ? $k->profesores : $c->profesores)->sortBy('Apellido')->values();
 
         $contexto = trim((string) $doc->Contexto) !== ''
             ? trim((string) $doc->Contexto)
@@ -37,10 +37,9 @@ class DocumentoService
             $cierre = trim($cierre) . ($cierre !== '' ? ' ' : '') . $fraseFechas;
         }
         $separadorCierre = $cierre !== '' && !preg_match('/^[,.;:]/u', $cierre) ? ' ' : '';
-        $correoDirector = Usuario::deRol('Director')
-            ->where('IdFacultad', $c->IdFacultad)
-            ->where('Activo', 1)
-            ->value('Correo');
+        $correoDirector = ($doc->FirmanteModo === 'propio' && $doc->FirmanteId)
+        ? Usuario::where('Id', $doc->FirmanteId)->value('Correo')
+        : Usuario::deRol('Director')->where('IdFacultad', $c->IdFacultad)->where('Activo', 1)->value('Correo');
 
         $saludo = $profes->count() > 1
             ? 'Estimados maestros,'
@@ -95,27 +94,29 @@ class DocumentoService
         Storage::disk('local')->put($this->carpeta($c) . '/oficio.pdf', $this->pdf($c)->output());
     }
 
+    private function archivoConstancia(Constancia $k): string { return 'constancia-' . $k->Id . '.pdf'; }
+
     public function guardarConstancia(Comision $c, Constancia $k): void
     {
-        Storage::disk('local')->put($this->carpeta($c) . '/constancia.pdf', $this->pdf($c, $k)->output());
+        Storage::disk('local')->put($this->carpeta($c) . '/' . $this->archivoConstancia($k), $this->pdf($c, $k)->output());
     }
 
-    public function borrarConstancia(Comision $c): void
+    public function borrarConstancia(Comision $c, Constancia $k): void
     {
-        Storage::disk('local')->delete($this->carpeta($c) . '/constancia.pdf');
+        Storage::disk('local')->delete($this->carpeta($c) . '/' . $this->archivoConstancia($k));
     }
 
     /** Sirve el PDF guardado (si falta, lo genera una sola vez). */
     public function respuestaPdf(Comision $c, ?Constancia $k = null)
     {
         $disk    = Storage::disk('local');
-        $archivo = $this->carpeta($c) . ($k ? '/constancia.pdf' : '/oficio.pdf');
+        $archivo = $this->carpeta($c) . '/' . ($k ? $this->archivoConstancia($k) : 'oficio.pdf');
 
         if (!$disk->exists($archivo)) {
             $k ? $this->guardarConstancia($c, $k) : $this->guardarOficio($c);
         }
 
-        $nombre = ($k ? 'Constancia-' : '') . $c->NOficio . '.pdf';
+        $nombre = ($k ? 'Constancia-' . $k->Id . '-' : '') . $c->NOficio . '.pdf';
 
         return response()->file($disk->path($archivo), [
             'Content-Type'        => 'application/pdf',
@@ -172,6 +173,7 @@ class DocumentoService
         return preg_replace('/\s+/', ' ', trim("$g {$u->Nombre} {$u->Apellido}"));
     }
 
+    
     private function fraseFechas(Comision $c, bool $esConstancia = false): string
     {
         if (!$c->FechaInicio) return '';

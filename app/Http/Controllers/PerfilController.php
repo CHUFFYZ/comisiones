@@ -6,6 +6,8 @@ use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use App\Services\AccesoService;
+
 
 class PerfilController extends Controller
 {
@@ -74,6 +76,39 @@ class PerfilController extends Controller
         Usuario::where('Id', $u->Id)->update(['FotoUrl' => null]);
 
         return back()->with('ok', 'Foto eliminada.');
+    }
+
+    public function firmaSello(Request $r)
+    {
+        abort_unless(app(AccesoService::class)->puedeFirmar($r->user()), 403);
+        $r->validate([
+            'Firma' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+            'Sello' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+        ], ['Firma.image' => 'La firma debe ser una imagen.', 'Sello.image' => 'El sello debe ser una imagen.']);
+
+        $u = $r->user();
+        $mat = $this->limpia($u->Matricula);
+        $dir = 'image/firmas';
+        $cambios = [];
+
+        foreach (['Firma' => 'FirmaUrl', 'Sello' => 'SelloUrl'] as $campo => $col) {
+            if (!$r->hasFile($campo)) continue;
+            $f   = $r->file($campo);
+            $ext = $f->guessExtension() === 'jpeg' ? 'jpg' : $f->guessExtension();
+            if ($u->$col && !preg_match('#^https?://#i', $u->$col) && is_file(public_path($u->$col))) {
+                @unlink(public_path($u->$col));
+            }
+            File::ensureDirectoryExists(public_path($dir));
+            $nombre = strtolower($campo) . "-$mat.$ext";
+            $f->move(public_path($dir), $nombre);
+            $cambios[$col] = "$dir/$nombre";
+        }
+
+        if (!$cambios) return back()->withErrors(['general' => 'Selecciona al menos una imagen.']);
+
+        Usuario::where('Id', $u->Id)->update($cambios + ['UpdatedAt' => now(), 'UpdatedBy' => $u->Matricula]);
+
+        return back()->with('ok', 'Firma/sello actualizados. Los documentos ya firmados no cambian.');
     }
 
     private function borrarActual(Usuario $u): void

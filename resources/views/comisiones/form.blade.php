@@ -76,23 +76,26 @@
                     </div>
 
                     <div class="col-12">
-                        <label class="form-label">Profesores <span class="text-danger">*</span></label>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label class="form-label mb-1">Profesores <span class="text-danger">*</span></label>
+                            <span class="small text-body-secondary" id="contProf"></span>
+                        </div>
                         <div class="input-group mb-2">
                             <span class="input-group-text bg-transparent"><i class="fa-solid fa-magnifying-glass"></i></span>
                             <input type="search" id="buscaProf" class="form-control" placeholder="Buscar profesor…">
                         </div>
                         @php $marcados = old('profesores', $edit ? $comision->profesores->pluck('Id')->all() : []); @endphp
-                        <div class="border rounded-3 p-2 lista-scroll bg-white">
+                        <div class="border rounded-3 p-2 lista-scroll bg-white" style="max-height: 220px;">
                             @forelse ($profesores as $p)
                                 <div class="form-check prof-item">
-                                    <input class="form-check-input" type="checkbox" name="profesores[]" value="{{ $p->Id }}" id="p{{ $p->Id }}"
-                                           @checked(in_array($p->Id, $marcados))>
+                                    <input class="form-check-input" type="checkbox" name="profesores[]" value="{{ $p->Id }}" id="p{{ $p->Id }}" @checked(in_array($p->Id, $marcados))>
                                     <label class="form-check-label small" for="p{{ $p->Id }}">{{ $p->GradoAcademico }} {{ $p->nombre_corto }}</label>
                                 </div>
                             @empty
                                 <p class="small text-body-secondary mb-0">No hay profesores registrados en tu facultad.</p>
                             @endforelse
                         </div>
+                        <button type="button" id="btnMasProf" class="btn btn-link btn-sm px-0 d-none"></button>
                     </div>
 
                     <div class="col-12 d-flex gap-2 justify-content-end">
@@ -126,11 +129,33 @@
     let temporizador, ultimaSugerida = '';
 
     // Busca de profesores
-    document.getElementById('buscaProf').addEventListener('input', e => {
-        const t = e.target.value.toLowerCase();
-        document.querySelectorAll('.prof-item').forEach(el =>
-            el.classList.toggle('d-none', !el.textContent.toLowerCase().includes(t)));
-    });
+    const LIMITE_PROF = 5;   // profesores visibles cuando está colapsada
+    const itemsProf = [...document.querySelectorAll('.prof-item')];
+    const buscaProf = document.getElementById('buscaProf');
+    const btnMas = document.getElementById('btnMasProf');
+    let verTodos = false;
+
+    function pintarProfes() {
+        const t = buscaProf.value.trim().toLowerCase();
+        let n = 0;
+        itemsProf.forEach(el => {
+            const coincide = !t || el.textContent.toLowerCase().includes(t);
+            const marcado = el.querySelector('input').checked;
+            if (coincide) n++;
+            // colapsada: solo los primeros N (y siempre los ya seleccionados)
+            el.classList.toggle('d-none', !coincide || (!verTodos && !t && n > LIMITE_PROF && !marcado));
+        });
+        btnMas.classList.toggle('d-none', t !== '' || itemsProf.length <= LIMITE_PROF);
+        btnMas.innerHTML = verTodos
+            ? '<i class="fa-solid fa-chevron-up me-1"></i> Mostrar menos'
+            : `<i class="fa-solid fa-chevron-down me-1"></i> Ver los ${itemsProf.length} profesores`;
+        document.getElementById('contProf').textContent =
+            itemsProf.filter(el => el.querySelector('input').checked).length + ' seleccionado(s)';
+    }
+    buscaProf.addEventListener('input', pintarProfes);
+    btnMas.addEventListener('click', () => { verTodos = !verTodos; pintarProfes(); });
+    itemsProf.forEach(el => el.querySelector('input').addEventListener('change', pintarProfes));
+    pintarProfes();
 
     // Sugerir el contexto según el tipo (solo si está vacío o es la sugerencia anterior)
     tipo.addEventListener('change', () => {

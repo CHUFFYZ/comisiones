@@ -41,6 +41,7 @@ return [
             ['nombre' => 'Plantillas de oficio','icono' => 'fa-file-lines',  'ruta' => 'admin.plantillas.index', 'accion' => 'actualizar'],
             ['nombre' => 'Bajas',               'icono' => 'fa-user-slash',  'ruta' => 'admin.usuarios.bajas',   'accion' => 'eliminar'],
             ['nombre' => 'Reportes',            'icono' => 'fa-print',       'ruta' => 'reportes.index',         'accion' => 'leer', 'params' => ['modulo' => 'MA']],
+            ['nombre' => 'Firma Sec. Académica', 'icono' => 'fa-signature', 'ruta' => 'admin.facultades.index', 'accion' => 'actualizar', 'excluye' => ['Administrador', 'SecretariaAcademica']],
         ],
     ],
 ];
