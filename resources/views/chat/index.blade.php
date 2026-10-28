@@ -41,6 +41,17 @@
                 <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2 chat-cabecera" id="chatCabecera">
                     <span class="fw-semibold text-body-secondary">Selecciona una conversación</span>
                 </div>
+
+                {{-- Buscador de mensajes --}}
+                <div id="barraBusqueda" class="border-bottom p-2 d-none">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-transparent"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="search" id="buscaMsg" class="form-control" placeholder="Buscar en esta conversación…" autocomplete="off">
+                        <button type="button" class="btn btn-secondary btn-sm" id="cerrarBusqueda" aria-label="Cerrar búsqueda"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div id="resultadosBusqueda" class="list-group list-group-flush lista-scroll mt-2"></div>
+                </div>
+
                 <div class="chat-mensajes flex-grow-1 p-3 d-flex flex-column gap-2" id="mensajes"></div>
                 <form id="formEnviar" class="p-3 border-top d-none">
                     <div id="barraContexto" class="barra-contexto d-none">
@@ -83,6 +94,7 @@
         editar: @json(route('chat.editar', ['id' => '__ID__', 'mensaje' => '__MSG__'])),
         eliminar: @json(route('chat.eliminar', '__ID__')),
         supMsg: @json(route('chat.supervision.mensajes', '__ID__')),
+        buscar: @json(route('chat.buscar', '__ID__')),
     };
     const MI_FAC = @json($miFacultad);
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
@@ -95,7 +107,7 @@
     const badgeFac = f => f ? `<span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis text-xs">${esc(f)}</span>` : '';
 
     let modo = 'mios', activa = null, ultimaFirma = '', ultimaCab = '', usuarios = null;
-    let mensajesActuales = [], contactoActual = null, respondiendo = null, editando = null;
+    let mensajesActuales = [], contactoActual = null, respondiendo = null, editando = null, tBusqueda = null;
 
     async function api(url, opciones = {}) {
         const r = await fetch(url, {
@@ -130,10 +142,10 @@
     /* ───────── cabecera: volver (móvil) · info · menú ⋮ · cerrar (escritorio) ───────── */
     const BTN_VOLVER = `<button type="button" class="btn-icono d-md-none" data-cerrar aria-label="Volver a la lista" title="Volver"><i class="fa-solid fa-arrow-left"></i></button>`;
     const BTN_CERRAR = `<button type="button" class="btn-icono d-none d-md-inline-flex" data-cerrar aria-label="Cerrar conversación" title="Cerrar conversación"><i class="fa-solid fa-xmark"></i></button>`;
-    // Aquí se irán agregando más opciones en el futuro
     const MENU = `<div class="dropdown">
         <button type="button" class="btn-icono" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más opciones" title="Más opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+            <li><button type="button" class="dropdown-item small" data-buscar><i class="fa-solid fa-magnifying-glass w-20px"></i> Buscar mensajes</button></li>
             <li><button type="button" class="dropdown-item small text-danger" data-eliminar><i class="fa-solid fa-trash w-20px"></i> Eliminar chat</button></li>
         </ul></div>`;
 
@@ -144,7 +156,7 @@
     function cabeceraContacto(c) {
         if (!c) return;
         const firma = JSON.stringify(c);
-        if (firma === ultimaCab) return;     // evita cerrar el menú abierto en cada refresco
+        if (firma === ultimaCab) return;
         ultimaCab = firma;
         pintarCabecera(`
             <button type="button" class="btn p-0 border-0 bg-transparent" ${c.id ? `data-perfil="${c.id}"` : 'disabled'}>${avatar(c.foto, c.nombre, 'chat-avatar--lg')}</button>
@@ -157,7 +169,7 @@
 
     function cerrarConversacion() {
         activa = null; ultimaFirma = ''; ultimaCab = ''; mensajesActuales = []; contactoActual = null;
-        cancelarContexto();
+        cancelarContexto(); cerrarBusqueda();
         $('mensajes').innerHTML = '';
         $('chatCabecera').innerHTML = '<span class="fw-semibold text-body-secondary">Selecciona una conversación</span>';
         $('chatWrap').classList.remove('conversacion-abierta');
@@ -167,7 +179,7 @@
 
     async function abrirConversacion(id, titulo) {
         activa = id; ultimaFirma = ''; ultimaCab = '';
-        cancelarContexto();
+        cancelarContexto(); cerrarBusqueda();
         $('chatWrap').classList.add('conversacion-abierta');
         pintarCabecera(`<span class="fw-semibold">${esc(titulo)}</span>`, modo === 'mios');
         $('mensajes').innerHTML = '';
@@ -177,12 +189,50 @@
 
     $('chatCabecera').addEventListener('click', async e => {
         if (e.target.closest('[data-cerrar]')) return cerrarConversacion();
+        if (e.target.closest('[data-buscar]') && activa) return abrirBusqueda();
         if (!e.target.closest('[data-eliminar]') || !activa) return;
         if (!await confirmar('Esta conversación se quitará de tu lista. La otra persona seguirá viéndola.', 'Eliminar chat', 'Eliminar')) return;
         try {
             await api(RUTAS.eliminar.replace('__ID__', activa), { method: 'DELETE' });
             cerrarConversacion(); showToast('Chat eliminado de tu lista.');
         } catch (err) { showToast(err.message, 'error'); }
+    });
+
+    /* ───────── búsqueda de mensajes ───────── */
+    function abrirBusqueda() {
+        $('barraBusqueda').classList.remove('d-none');
+        $('buscaMsg').focus();
+    }
+    function cerrarBusqueda() {
+        clearTimeout(tBusqueda);
+        $('barraBusqueda').classList.add('d-none');
+        $('buscaMsg').value = ''; $('resultadosBusqueda').innerHTML = '';
+    }
+    const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    async function buscarMensajes() {
+        const q = $('buscaMsg').value.trim(), caja = $('resultadosBusqueda');
+        if (!activa || q.length < 2) { caja.innerHTML = q.length ? '<div class="small text-body-secondary px-2">Escribe al menos 2 letras.</div>' : ''; return; }
+        try {
+            const items = await api(RUTAS.buscar.replace('__ID__', activa) + '?q=' + encodeURIComponent(q));
+            const re = new RegExp(reEsc(esc(q)), 'gi');
+            caja.innerHTML = items.length ? items.map(m => `
+                <button type="button" class="list-group-item list-group-item-action small py-2" data-msg="${m.id}">
+                    <div class="text-xs text-body-secondary">${m.mio ? 'Tú' : 'Contacto'} · ${esc(m.fecha)}</div>
+                    <div class="text-break">${esc(m.texto).replace(re, x => `<mark>${x}</mark>`)}</div>
+                </button>`).join('')
+                : '<div class="small text-body-secondary px-2">Sin resultados.</div>';
+        } catch (err) { showToast(err.message, 'error'); }
+    }
+    $('buscaMsg').addEventListener('input', () => { clearTimeout(tBusqueda); tBusqueda = setTimeout(buscarMensajes, 350); });
+    $('cerrarBusqueda').addEventListener('click', cerrarBusqueda);
+    $('resultadosBusqueda').addEventListener('click', e => {
+        const b = e.target.closest('[data-msg]');
+        if (!b) return;
+        const el = $('mensajes').querySelector(`[data-id="${b.dataset.msg}"]`);
+        if (!el) { showToast('Es un mensaje antiguo que no está cargado; léelo en los resultados.', 'error'); return; }
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.classList.add('resaltado'); setTimeout(() => el.classList.remove('resaltado'), 2000);
     });
 
     /* ───────── mensajes ───────── */
@@ -208,7 +258,6 @@
                         : ' <i class="fa-solid fa-check"></i>') : '';
                     const cita = m.respuesta
                         ? `<div class="cita" data-ir="${m.respuesta.id}"><strong>${esc(m.respuesta.autor)}</strong><span>${esc(m.respuesta.texto)}</span></div>` : '';
-                    // Sin saltos de línea dentro de la burbuja (usa white-space: pre-wrap)
                     const burbuja = `<div class="burbuja ${m.mio ? 'mia' : 'otra'}">` + (m.autor ? `<strong>${esc(m.autor)}</strong><br>` : '') + cita + esc(m.texto)
                         + `<small>${esc(m.fecha)}${m.editado ? ' · editado' : ''}${estado}</small></div>`;
                     const acciones = modo === 'mios' ? `<div class="msg-acciones">`
@@ -278,13 +327,14 @@
             await cargarMensajes(true); cargarLista();
         } catch (err) {
             showToast(err.message, 'error');
-            if (editando) cancelarContexto();   // p. ej. ya pasaron los 15 minutos
+            if (editando) cancelarContexto();
         }
     });
 
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape' || !activa || document.querySelector('.modal.show')) return;
-        if (respondiendo || editando) cancelarContexto(); else cerrarConversacion();
+        if (!$('barraBusqueda').classList.contains('d-none')) cerrarBusqueda();
+        else if (respondiendo || editando) cancelarContexto(); else cerrarConversacion();
     });
 
     $('lista').addEventListener('click', e => {

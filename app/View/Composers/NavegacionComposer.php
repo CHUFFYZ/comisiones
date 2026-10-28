@@ -4,14 +4,14 @@ namespace App\View\Composers;
 
 use App\Models\ChatConversacion;
 use App\Models\ChatMensaje;
+use App\Models\Comision;
+use App\Models\Constancia;
 use App\Models\Facultad;
 use App\Models\Modulo;
 use App\Models\Notificacion;
 use App\Models\Usuario;
 use App\Services\AccesoService;
 use Illuminate\View\View;
-use App\Models\Comision;
-use App\Models\Constancia;
 
 class NavegacionComposer
 {
@@ -19,51 +19,47 @@ class NavegacionComposer
 
     public function compose(View $view): void
     {
-        $user = auth()->user();
+        $user = auth()->user();                                  // usuario efectivo (el simulado, si aplica)
+        $real = request()->attributes->get('usuario_real');      // superusuario real que simula
 
-        // Módulo en el que está navegando (lo fija el middleware)
-        $moduloEnUso = request()->attributes->get('modulo');
-
-        // Para el header: módulo en uso o, si no hay, el principal CATI (MP)
+        $moduloEnUso  = request()->attributes->get('modulo');
         $moduloActual = $moduloEnUso ?? Modulo::where('Clave', 'MP')->first();
-
-        $facultadActual = $user?->facultad
-            ?? Facultad::where('Clave', 'FCI')->first();
+        $facultadActual = $user?->facultad ?? Facultad::where('Clave', 'FCI')->first();
 
         $data = [
             'moduloActual'   => $moduloActual,
             'moduloEnUso'    => $moduloEnUso,
             'facultadActual' => $facultadActual,
             'modulosMenu'    => $this->acceso->modulosDe($user),
-            'opcionesModulo' => $moduloEnUso
-                ? $this->acceso->opcionesDe($user, $moduloEnUso->Clave)
-                : collect(),
+            'opcionesModulo' => $moduloEnUso ? $this->acceso->opcionesDe($user, $moduloEnUso->Clave) : collect(),
             'esProfesor'      => false,
             'notifNoLeidas'   => 0,
             'notifRecientes'  => collect(),
             'chatNoLeidos'    => 0,
             'puedeSimular'    => false,
             'simulado'        => null,
-            'secretariasSim'  => collect(),
+            'usuariosSim'     => collect(),
             'puedeGestion'    => false,
             'puedeFirmar' => false, 'firmasPendientes' => 0,
         ];
 
         if ($user) {
             if ($this->acceso->puedeFirmar($user)) {
-            $falta = fn ($q) => $q->whereNull('FirmaAt')->orWhereNull('SelloAt');
-            $data['puedeFirmar'] = true;
-            $data['firmasPendientes'] =
-                Comision::where('IdFacultad', $user->IdFacultad)->whereNull('DeletedAt')->where($falta)->count()
-                + Constancia::where('Activo', 1)->where($falta)
-                    ->whereHas('comision', fn ($q) => $q->where('IdFacultad', $user->IdFacultad)->whereNull('DeletedAt'))->count();
-}
+                $fac   = $this->acceso->esSuperUsuario($user) ? null : $user->IdFacultad;
+                $falta = fn ($q) => $q->whereNull('FirmaAt')->orWhereNull('SelloAt');
+                $data['puedeFirmar'] = true;
+                $data['firmasPendientes'] =
+                    Comision::when($fac, fn ($q) => $q->where('IdFacultad', $fac))->whereNull('DeletedAt')->where($falta)->count()
+                    + Constancia::where('Activo', 1)->where($falta)
+                        ->whereHas('comision', fn ($q) => $q->when($fac, fn ($w) => $w->where('IdFacultad', $fac))->whereNull('DeletedAt'))->count();
+            }
             $data['puedeGestion'] = $this->acceso->puedeGestionarUsuarios($user);
-            if ($this->acceso->esSuperUsuario($user)) {
-                $data['puedeSimular']   = true;
-                $data['simulado']       = ($sid = session('simulando')) ? Usuario::with('facultad')->find($sid) : null;
-                $data['secretariasSim'] = Usuario::with('facultad')->where('Activo', 1)
-                    ->deRol(['Secretaria', 'SecretariaAcademica'])->orderBy('IdFacultad')->orderBy('Nombre')->get()
+
+            if ($real || $this->acceso->esSuperUsuario($user)) {
+                $data['puedeSimular'] = true;
+                $data['simulado']     = $real ? $user : null;
+                $data['usuariosSim']  = Usuario::with('facultad')->where('Activo', 1)->orderBy('IdFacultad')->orderBy('Nombre')->get()
+                    ->reject(fn ($x) => $this->acceso->esSuperUsuario($x))
                     ->groupBy(fn ($s) => $s->facultad->Clave ?? 'Sin facultad');
             }
             $data['esProfesor']     = $user->Rol === 'Profesor' || $user->comisiones()->exists();

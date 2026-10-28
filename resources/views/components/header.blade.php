@@ -10,7 +10,6 @@
                 <small class="text-white-50 text-xs" title="{{ $facultadActual->Nombre ?? '' }}">{{ $facultadActual->Clave ?? 'FCI' }} | UNACAR</small>
             </div>
         @else
-            <!-- Invitado: sin menú lateral, el logo vive en el header -->
             <a href="{{ route('inicio') }}" class="d-flex align-items-center gap-2 text-white">
                 <img src="{{ asset('img/logo.png') }}" alt="Logo" class="app-logo"
                      onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none')">
@@ -69,7 +68,6 @@
 
             <!-- Usuario -->
             <div class="dropdown">
-                {{-- auto-close="outside": el menú no se cierra al abrir/cerrar "Mis módulos" --}}
                 <button class="btn btn-logout btn-sm d-flex align-items-center gap-2" type="button"
                         data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
                     @if (auth()->user()->foto_src)
@@ -99,10 +97,9 @@
                     <li><a class="dropdown-item small" href="{{ route('perfil') }}"><i class="fa-solid fa-id-card w-20px"></i> Mi perfil</a></li>
                     @if ($puedeSimular)
                         <li><button type="button" class="dropdown-item small" data-bs-toggle="modal" data-bs-target="#modalSimular">
-                            <i class="fa-solid fa-user-secret w-20px"></i> Simular secretaria</button></li>
+                            <i class="fa-solid fa-user-secret w-20px"></i> Simular usuario</button></li>
                     @endif
 
-                    <!-- Mis módulos: botón colapsable, los módulos son sus opciones -->
                     <li>
                         <button class="dropdown-item small d-flex align-items-center" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#menuModulos"
@@ -112,11 +109,18 @@
                         </button>
                         <div class="collapse" id="menuModulos">
                             <ul class="list-unstyled mb-0 ps-3">
-                                {{-- Mis comisiones (módulo del profesor) --}}
                                 @if ($esProfesor)
                                     <li>
                                         <a class="dropdown-item small" href="{{ route('profesor.panel') }}">
                                             <i class="fa-solid fa-chalkboard-user w-20px"></i> Mis comisiones
+                                        </a>
+                                    </li>
+                                @endif
+                                @if ($puedeFirmar)
+                                    <li>
+                                        <a class="dropdown-item small" href="{{ route('firmas.index') }}">
+                                            <i class="fa-solid fa-signature w-20px"></i> Firmas y sellos
+                                            @if ($firmasPendientes > 0)<span class="badge rounded-pill bg-danger ms-1">{{ $firmasPendientes }}</span>@endif
                                         </a>
                                     </li>
                                 @endif
@@ -128,7 +132,7 @@
                                         </a>
                                     </li>
                                 @empty
-                                    @unless ($esProfesor)<li class="dropdown-item-text small text-body-secondary">Sin módulos asignados</li>@endunless
+                                    @unless ($esProfesor || $puedeFirmar)<li class="dropdown-item-text small text-body-secondary">Sin módulos asignados</li>@endunless
                                 @endforelse
                             </ul>
                         </div>

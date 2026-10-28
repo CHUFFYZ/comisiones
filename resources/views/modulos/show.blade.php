@@ -44,7 +44,7 @@
         @endforeach
     </div>
 
-    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-3">
         <div class="col">
             <div class="card stat-card h-100">
                 <div class="d-flex align-items-center justify-content-between">
@@ -82,6 +82,27 @@
         </div>
     </div>
 
+    @if ($pendFirma)
+    <div class="row row-cols-1 row-cols-md-2 g-3 mb-4">
+        <div class="col">
+            <div class="card stat-card h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div><div class="stat-num">{{ $pendFirma['comisiones']['n'] }}</div><div class="stat-label">Oficios sin firma o sello</div></div>
+                    <div class="stat-icon estado-no-iniciado"><i class="fa-solid fa-signature"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card stat-card h-100">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div><div class="stat-num">{{ $pendFirma['constancias']['n'] }}</div><div class="stat-label">Constancias sin firma o sello</div></div>
+                    <div class="stat-icon estado-proceso"><i class="fa-solid fa-stamp"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- Gráficas --}}
     <div class="row g-3 mb-4">
         <div class="col-lg-4">
@@ -105,7 +126,7 @@
     </div>
 
     {{-- Pendientes --}}
-    <div class="row g-3">
+    <div class="row g-3 {{ $pendFirma ? 'mb-3' : '' }}">
         <div class="col-lg-6">
             <div class="card h-100">
                 <div class="card-header bg-white border-0 pt-3 px-4 font-syne fw-bold">Finalizadas sin constancia</div>
@@ -136,6 +157,41 @@
             </div>
         </div>
     </div>
+
+    @if ($pendFirma)
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0 pt-3 px-4 font-syne fw-bold">Oficios sin firma o sello</div>
+                <div class="list-group list-group-flush">
+                    @forelse ($pendFirma['comisiones']['lista'] as $c)
+                        <a href="{{ route('comisiones.show', $c->Id) }}" class="list-group-item list-group-item-action px-4 small d-flex justify-content-between align-items-center gap-2">
+                            <span><span class="font-monospace">{{ $c->NOficio }}</span> · {{ \Illuminate\Support\Str::limit($c->Asunto, 35) }}</span>
+                            <span class="text-nowrap">@include('firmas.partials.estado', ['d' => $c])</span>
+                        </a>
+                    @empty
+                        <div class="px-4 py-4 small text-body-secondary">Todos los oficios están firmados y sellados.</div>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0 pt-3 px-4 font-syne fw-bold">Constancias sin firma o sello</div>
+                <div class="list-group list-group-flush">
+                    @forelse ($pendFirma['constancias']['lista'] as $k)
+                        <a href="{{ route('comisiones.show', $k->IdComision) }}" class="list-group-item list-group-item-action px-4 small d-flex justify-content-between align-items-center gap-2">
+                            <span><span class="font-monospace">{{ $k->comision->NOficio ?? '—' }}</span> · {{ \Illuminate\Support\Str::limit($k->comision->Asunto ?? '', 35) }}</span>
+                            <span class="text-nowrap">@include('firmas.partials.estado', ['d' => $k])</span>
+                        </a>
+                    @empty
+                        <div class="px-4 py-4 small text-body-secondary">Todas las constancias están firmadas y selladas.</div>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 @else
     @if ($statsAdmin)
         @php

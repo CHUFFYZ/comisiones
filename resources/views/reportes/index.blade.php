@@ -7,14 +7,14 @@
     <div class="mb-4">
         <a href="{{ route('modulos.show', $clave) }}" class="small"><i class="fa-solid fa-arrow-left me-1"></i> Resumen</a>
         <h2 class="font-syne text-dark mt-1 mb-1">Reportes · {{ $modulo->Nombre }}</h2>
-        <p class="text-muted small mb-0">Se abren en una pestaña nueva, listos para imprimir o guardar como PDF.</p>
+        <p class="text-muted small mb-0">Al generar el reporte podrás elegir si exportarlo como PDF, Excel o CSV.</p>
     </div>
 
     <div class="alert alert-info small d-flex align-items-center gap-2">
         <i class="fa-solid fa-circle-info"></i><div><strong>Alcance de tus reportes:</strong> {{ $alcance }}</div>
     </div>
 
-    <form action="{{ route('reportes.imprimir', $clave) }}" method="GET" target="_blank" class="card p-4">
+    <form action="{{ route('reportes.imprimir', $clave) }}" method="GET" class="card p-4">
         <div class="row g-3">
             <div class="col-md-6">
                 <label class="form-label" for="reporte">Tipo de reporte</label>

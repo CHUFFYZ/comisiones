@@ -1,6 +1,5 @@
 <!-- resources/views/components/sidebar.blade.php -->
 <aside class="sidebar-wrapper" id="sidebar" aria-label="Menú principal">
-    <!-- Marca: ocupa la parte superior del lado izquierdo -->
     <div class="sidebar-brand d-flex align-items-center justify-content-between px-3">
         <a href="{{ route('inicio') }}" class="d-flex align-items-center gap-2 text-white">
             <img src="{{ asset('img/logo.png') }}" alt="Logo" class="app-logo"
@@ -16,7 +15,6 @@
 
     <div class="sidebar-body">
 
-        {{-- Navegación global --}}
         <ul class="nav nav-pills flex-column mb-2">
             <li class="nav-item mb-1">
                 <a href="{{ route('inicio') }}" class="nav-link {{ request()->routeIs('inicio') ? 'active' : '' }}">
@@ -24,7 +22,6 @@
                     <span>Panel principal</span>
                 </a>
             </li>
-
 
             <li class="nav-item mb-1">
                 <a href="{{ route('chat.index') }}" class="nav-link {{ request()->routeIs('chat.*') ? 'active' : '' }}">
@@ -41,15 +38,6 @@
                     @if ($notifNoLeidas > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $notifNoLeidas }}</span>@endif
                 </a>
             </li>
-            @if ($puedeFirmar)
-            <li class="nav-item mb-1">
-                <a href="{{ route('firmas.index') }}" class="nav-link {{ request()->routeIs('firmas.*') ? 'active' : '' }}">
-                    <i class="fa-solid fa-signature w-20px"></i>
-                    <span>Firmas y sellos</span>
-                    @if ($firmasPendientes > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $firmasPendientes }}</span>@endif
-                </a>
-            </li>
-            @endif
 
             <li class="nav-item">
                 <button type="button" id="btnMisModulos"
@@ -63,12 +51,20 @@
 
                 <div class="collapse show" id="sidebarModulos">
                     <ul class="nav nav-pills flex-column ps-3 mt-1 submenu-modulos">
-                        {{-- Mis comisiones (módulo del profesor) --}}
                         @if ($esProfesor)
                             <li class="nav-item mb-1">
                                 <a href="{{ route('profesor.panel') }}" class="nav-link py-2 small {{ request()->routeIs('profesor.*') ? 'active' : '' }}">
                                     <i class="fa-solid fa-chalkboard-user w-20px"></i>
                                     <span>Mis comisiones</span>
+                                </a>
+                            </li>
+                        @endif
+                        @if ($puedeFirmar)
+                            <li class="nav-item mb-1">
+                                <a href="{{ route('firmas.index') }}" class="nav-link py-2 small {{ request()->routeIs('firmas.*') ? 'active' : '' }}">
+                                    <i class="fa-solid fa-signature w-20px"></i>
+                                    <span>Firmas y sellos</span>
+                                    @if ($firmasPendientes > 0)<span class="badge rounded-pill bg-danger ms-auto">{{ $firmasPendientes }}</span>@endif
                                 </a>
                             </li>
                         @endif
@@ -81,14 +77,13 @@
                                 </a>
                             </li>
                         @empty
-                            @unless ($esProfesor)<li class="small text-body-secondary px-3 py-2">Sin módulos asignados</li>@endunless
+                            @unless ($esProfesor || $puedeFirmar)<li class="small text-body-secondary px-3 py-2">Sin módulos asignados</li>@endunless
                         @endforelse
                     </ul>
                 </div>
             </li>
         </ul>
 
-        {{-- Opciones del módulo actual, filtradas por permiso --}}
         @if ($moduloEnUso)
             <hr class="my-2 opacity-10">
 

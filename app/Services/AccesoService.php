@@ -86,10 +86,6 @@ class AccesoService
         return str_contains($this->letrasEn($u, $claveModulo), self::LETRAS[$accion] ?? '?');
     }
 
-    /**
-     * Opciones del módulo que el usuario puede ver según su permiso.
-     * Cada item incluye 'url' (null si la ruta aún no existe).
-     */
     public function opcionesDe(?Usuario $u, string $claveModulo): Collection
     {
         return collect(config("modulos.opciones.$claveModulo", []))
@@ -132,15 +128,18 @@ class AccesoService
         return $n->filter(fn ($x) => in_array($x->modulo?->Clave, $mods, true))->values();
     }
 
+    /** Director, Sec. Académica y Superusuario (este último, de cualquier facultad). */
     public function puedeFirmar(?Usuario $u): bool
     {
-        return $u && in_array($u->Rol, ['Director', 'SecretariaAcademica'], true);
+        return $u && ($this->esSuperUsuario($u) || in_array($u->Rol, ['Director', 'SecretariaAcademica'], true));
     }
 
     public function puedeFirmarComoDirector(?Usuario $u): bool
     {
-        return $u && $u->Rol === 'SecretariaAcademica' && (bool) ($u->facultad?->SAFirmaComoDirector);
+        return $u && ($this->esSuperUsuario($u)
+            || ($u->Rol === 'SecretariaAcademica' && (bool) ($u->facultad?->SAFirmaComoDirector)));
     }
+
     /* ───────── internos ───────── */
 
     private function idModulo(string $clave): ?int
@@ -169,8 +168,6 @@ class AccesoService
             }
         }
 
-        // Secretaría Académica gestiona a sus secretarias: acceso implícito al módulo de Administración
-        // (el alcance real lo limita AccesoService::usuariosGestionables)
         if ($u->Rol === 'SecretariaAcademica' && ($ma = $this->idModulo('MA'))) {
             $out->push(['modulo' => $ma, 'letras' => 'CRUD']);
         }

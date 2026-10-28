@@ -29,7 +29,12 @@ class ComisionController extends Controller
                     ->where('Nombre', 'like', "%{$r->q}%")->orWhere('Apellido', 'like', "%{$r->q}%")
                     ->orWhereRaw("CONCAT(Nombre, ' ', Apellido) like ?", ["%{$r->q}%"])))))
             ->when($r->filled('estado'), fn ($q) => $q->where('IdEstado', $r->estado))
-            ->when($r->filled('tipo'), fn ($q) => $q->where('IdTipoComision', $r->tipo));
+            ->when($r->filled('tipo'), fn ($q) => $q->where('IdTipoComision', $r->tipo))
+            ->when($r->constancia === 'con', fn ($q) => $q->whereHas('constancias'))
+            ->when($r->constancia === 'sin', fn ($q) => $q->whereDoesntHave('constancias'))
+            ->when($r->filled('desde'), fn ($q) => $q->whereDate('FechaInicio', '>=', $r->desde))
+            ->when($r->filled('hasta'), fn ($q) => $q->whereDate('FechaInicio', '<=', $r->hasta))
+            ->when($r->fecha === 'sin', fn ($q) => $q->whereNull('FechaFin'));
 
         return view('comisiones.index', [
             'comisiones' => $q->paginate(15)->withQueryString(),

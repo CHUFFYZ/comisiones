@@ -6,23 +6,36 @@
 <div class="container-fluid p-0">
     <div class="mb-4">
         <h2 class="font-syne text-dark mb-1">Firmas y sellos</h2>
-        <p class="text-muted small mb-0">Oficios y constancias de tu facultad. Puedes firmar, sellar o ambos.</p>
+        <p class="text-muted small mb-0">
+            {{ $esSU ? 'Oficios y constancias de todas las facultades. Se firman con la firma y sello del Director de cada facultad.' : 'Oficios y constancias de tu facultad. Puedes firmar, sellar o ambos.' }}
+        </p>
     </div>
 
     @if ($errors->any() && !$errors->has('general'))
         <div class="alert alert-danger d-flex align-items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i><div>{{ $errors->first() }}</div></div>
     @endif
-    @if (!$u->FirmaUrl || !$u->SelloUrl)
+    @if (!$esSU && (!$u->FirmaUrl || !$u->SelloUrl))
         <div class="alert alert-warning">
             Aún no tienes {{ !$u->FirmaUrl && !$u->SelloUrl ? 'firma ni sello' : (!$u->FirmaUrl ? 'firma' : 'sello') }} cargado.
             <a href="{{ route('perfil') }}">Súbelo en Mi perfil</a>.
         </div>
     @endif
 
-    <ul class="nav nav-tabs mb-3">
-        <li class="nav-item"><a class="nav-link {{ $ver === 'pendientes' ? 'active' : '' }}" href="{{ route('firmas.index', ['ver' => 'pendientes']) }}">Pendientes</a></li>
-        <li class="nav-item"><a class="nav-link {{ $ver === 'completos' ? 'active' : '' }}" href="{{ route('firmas.index', ['ver' => 'completos']) }}">Firmados y sellados</a></li>
-    </ul>
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+        <ul class="nav nav-tabs">
+            <li class="nav-item"><a class="nav-link {{ $ver === 'pendientes' ? 'active' : '' }}" href="{{ route('firmas.index', ['ver' => 'pendientes', 'facultad' => $fac]) }}">Pendientes</a></li>
+            <li class="nav-item"><a class="nav-link {{ $ver === 'completos' ? 'active' : '' }}" href="{{ route('firmas.index', ['ver' => 'completos', 'facultad' => $fac]) }}">Firmados y sellados</a></li>
+        </ul>
+        @if ($esSU)
+            <form method="GET" class="m-0">
+                <input type="hidden" name="ver" value="{{ $ver }}">
+                <select name="facultad" class="form-select rounded-pill w-auto" onchange="this.form.submit()">
+                    <option value="">Todas las facultades</option>
+                    @foreach ($facultades as $f)<option value="{{ $f->Id }}" @selected($fac == $f->Id)>{{ $f->Clave }} · {{ $f->Nombre }}</option>@endforeach
+                </select>
+            </form>
+        @endif
+    </div>
 
     <form action="{{ route('firmas.procesar') }}" method="POST" class="card">
         @csrf
@@ -33,7 +46,7 @@
                     <option value="director">Como Director ({{ $director?->nombre_con_grado ?? 'sin director' }})</option>
                 </select>
             @else
-                <input type="hidden" name="modo" value="propio">
+                <input type="hidden" name="modo" value="{{ $esSU ? 'director' : 'propio' }}">
             @endif
             <button name="accion" value="firma" class="btn btn-ghost btn-sm"><i class="fa-solid fa-signature me-1"></i> Firmar</button>
             <button name="accion" value="sello" class="btn btn-ghost btn-sm"><i class="fa-solid fa-stamp me-1"></i> Sellar</button>
@@ -44,7 +57,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead><tr>
                     <th style="width:40px"><input type="checkbox" class="form-check-input" id="selTodos" aria-label="Seleccionar todos"></th>
-                    <th>Documento</th><th>Oficio</th><th>Asunto</th><th class="d-none d-md-table-cell">Profesores</th><th>Estado</th><th></th>
+                    <th>Documento</th>@if ($esSU)<th>Facultad</th>@endif<th>Oficio</th><th>Asunto</th><th class="d-none d-md-table-cell">Profesores</th><th>Estado</th><th></th>
                 </tr></thead>
                 <tbody>
                 @forelse ($docs as $x)
@@ -52,6 +65,7 @@
                     <tr>
                         <td><input type="checkbox" class="form-check-input chk-doc" name="items[]" value="{{ $x['tipo'] }}:{{ $d->Id }}"></td>
                         <td><span class="badge rounded-pill {{ $x['tipo'] === 'c' ? 'bg-primary-subtle text-primary-emphasis' : 'bg-success-subtle text-success-emphasis' }}">{{ $x['tipo'] === 'c' ? 'Oficio' : 'Constancia' }}</span></td>
+                        @if ($esSU)<td>{{ $c->facultad->Clave ?? '—' }}</td>@endif
                         <td class="font-monospace small">{{ $c->NOficio }}</td>
                         <td>{{ \Illuminate\Support\Str::limit($c->Asunto, 50) }}</td>
                         <td class="d-none d-md-table-cell small">{{ $x['profes']->pluck('nombre_corto')->join(', ') }}</td>
@@ -62,7 +76,7 @@
                         <td class="text-end"><a href="{{ route('firmas.pdf', [$x['tipo'], $d->Id]) }}" target="_blank" class="btn btn-ghost btn-sm"><i class="fa-solid fa-file-pdf me-1"></i> Ver</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center py-5 text-body-secondary"><i class="fa-solid fa-inbox fs-1 opacity-50 mb-2 d-block"></i> Nada por aquí.</td></tr>
+                    <tr><td colspan="8" class="text-center py-5 text-body-secondary"><i class="fa-solid fa-inbox fs-1 opacity-50 mb-2 d-block"></i> Nada por aquí.</td></tr>
                 @endforelse
                 </tbody>
             </table>

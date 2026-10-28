@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Comision;
 use App\Models\Constancia;
+use App\Models\Facultad;
 use App\Services\AccesoService;
 use App\Services\DocumentoService;
 use App\Services\FirmaService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
-/** Panel de firma y sello: solo Director y Secretaría Académica, solo de su facultad. */
+/** Panel de firma y sello: Director y Sec. Académica (su facultad) · Superusuario (todas). */
 class FirmaController extends Controller
 {
     public function __construct(private AccesoService $acc, private FirmaService $svc, private DocumentoService $docs) {}
@@ -25,12 +26,15 @@ class FirmaController extends Controller
 
     public function index(Request $r)
     {
-        $u   = $this->autorizar($r);
-        $ver = $r->query('ver') === 'completos' ? 'completos' : 'pendientes';
+        $u    = $this->autorizar($r);
+        $esSU = $this->acc->esSuperUsuario($u);
+        $ver  = $r->query('ver') === 'completos' ? 'completos' : 'pendientes';
+        $fac  = $esSU ? ($r->filled('facultad') ? (int) $r->facultad : null) : (int) $u->IdFacultad;
 
-        $comisiones = Comision::with('profesores')->where('IdFacultad', $u->IdFacultad)->whereNull('DeletedAt')->orderByDesc('Id')->get();
-        $constancias = Constancia::with(['profesores', 'comision'])->where('Activo', 1)
-            ->whereHas('comision', fn ($q) => $q->where('IdFacultad', $u->IdFacultad)->whereNull('DeletedAt'))
+        $comisiones = Comision::with(['profesores', 'facultad'])->whereNull('DeletedAt')
+            ->when($fac, fn ($q) => $q->where('IdFacultad', $fac))->orderByDesc('Id')->get();
+        $constancias = Constancia::with(['profesores', 'comision.facultad'])->where('Activo', 1)
+            ->whereHas('comision', fn ($q) => $q->whereNull('DeletedAt')->when($fac, fn ($w) => $w->where('IdFacultad', $fac)))
             ->orderByDesc('Id')->get();
 
         $docs = $comisiones->map(fn ($c) => ['tipo' => 'c', 'doc' => $c, 'c' => $c, 'profes' => $c->profesores])
@@ -41,8 +45,9 @@ class FirmaController extends Controller
             ->take(300)->values();
 
         return view('firmas.index', [
-            'docs' => $docs, 'ver' => $ver, 'u' => $u,
-            'puedeComoDirector' => $this->acc->puedeFirmarComoDirector($u),
+            'docs' => $docs, 'ver' => $ver, 'u' => $u, 'esSU' => $esSU, 'fac' => $fac,
+            'facultades' => $esSU ? Facultad::where('Activo', 1)->orderBy('Clave')->get() : collect(),
+            'puedeComoDirector' => !$esSU && $this->acc->puedeFirmarComoDirector($u),
             'director' => $this->svc->director($u->IdFacultad),
         ]);
     }
@@ -87,7 +92,7 @@ class FirmaController extends Controller
             $k = null;
             $c = Comision::findOrFail($id);
         }
-        abort_unless((int) $c->IdFacultad === (int) $u->IdFacultad, 403);
+        abort_unless($this->acc->esSuperUsuario($u) || (int) $c->IdFacultad === (int) $u->IdFacultad, 403);
 
         return $this->docs->respuestaPdf($c->load('facultad'), $k);
     }

@@ -35,13 +35,14 @@ class FirmaService
         return $v;
     }
 
-    /** $accion: firma | sello | ambos | retirar · $modo: propio | director */
+    /** $accion: firma | sello | ambos | retirar · $modo: propio | director (el superusuario siempre firma como Director de la facultad del documento) */
     public function aplicar(Usuario $u, Model $doc, string $accion, string $modo): void
     {
         $this->falla(!$this->acc->puedeFirmar($u), 'No tienes permiso para firmar.');
+        $esSU = $this->acc->esSuperUsuario($u);
 
         $c = $doc instanceof Constancia ? $doc->comision : $doc;
-        $this->falla((int) $c->IdFacultad !== (int) $u->IdFacultad, 'El documento es de otra facultad.');
+        $this->falla(!$esSU && (int) $c->IdFacultad !== (int) $u->IdFacultad, 'El documento es de otra facultad.');
         $this->falla($c->DeletedAt !== null, "La comisión {$c->NOficio} está anulada.");
 
         if ($accion === 'retirar') {
@@ -49,12 +50,12 @@ class FirmaService
             return;
         }
 
-        $modo = $u->Rol === 'Director' ? 'director' : $modo;
+        $modo = ($u->Rol === 'Director' || $esSU) ? 'director' : $modo;
         if ($modo === 'director' && $u->Rol === 'SecretariaAcademica') {
             $this->falla(!$this->acc->puedeFirmarComoDirector($u), 'Tu facultad no tiene habilitado firmar como Director.');
         }
 
-        $firmante = $modo === 'director' ? $this->director($u->IdFacultad) : $u;
+        $firmante = $modo === 'director' ? $this->director((int) $c->IdFacultad) : $u;
         $this->falla(!$firmante, 'No hay un Director activo en la facultad.');
 
         if (($doc->firmado || $doc->sellado)

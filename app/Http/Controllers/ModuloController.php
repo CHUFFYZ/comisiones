@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AsignacionPermiso;
+use App\Models\Constancia;
 use App\Models\PlantillaDocumento;
 use App\Models\Usuario;
 use App\Services\AccesoService;
@@ -35,8 +36,8 @@ class ModuloController extends Controller
             'modulo'   => $modulo,
             'permiso'  => $this->acceso->letrasEn($user, $modulo->Clave),
             'opciones' => $this->acceso->opcionesDe($user, $modulo->Clave),
-            // Tablero de comisiones solo para SisComisiones; Administración tiene el suyo
             'stats'      => $modulo->Clave === 'MSC' ? $this->comisiones->estadisticas($this->actor($request)) : null,
+            'pendFirma'  => $modulo->Clave === 'MSC' ? $this->pendientesFirma($this->actor($request)) : null,
             'statsAdmin' => $modulo->Clave === 'MA' && $this->acceso->puedeGestionarUsuarios($user) ? $this->statsAdmin($user) : null,
             'puedeReporte' => match ($modulo->Clave) {
                 'MSC'   => $this->acceso->puede($user, 'MSC', 'leer'),
@@ -44,6 +45,21 @@ class ModuloController extends Controller
                 default => false,
             },
         ]);
+    }
+
+    /** Oficios y constancias (de su alcance) a los que les falta firma o sello. */
+    private function pendientesFirma(Usuario $u): array
+    {
+        $falta = fn ($q) => $q->whereNull('FirmaAt')->orWhereNull('SelloAt');
+
+        $com = $this->comisiones->visibles($u, false)->where($falta);
+        $ids = $this->comisiones->visibles($u, false)->reorder()->select('Id');
+        $con = Constancia::with('comision')->where('Activo', 1)->where($falta)->whereIn('IdComision', $ids);
+
+        return [
+            'comisiones'  => ['n' => (clone $com)->count(), 'lista' => $com->limit(5)->get()],
+            'constancias' => ['n' => (clone $con)->count(), 'lista' => $con->orderByDesc('Id')->limit(5)->get()],
+        ];
     }
 
     /** Indicadores de usuarios dentro del alcance de quien consulta. */

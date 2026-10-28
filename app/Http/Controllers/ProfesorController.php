@@ -15,10 +15,22 @@ class ProfesorController extends Controller
 
     public function panel(Request $r)
     {
-        $todas = $this->svc->delProfesor($r->user())->get();
+        $u     = $r->user();
+        $todas = $this->svc->delProfesor($u)->get();
+
+        // ¿Tiene constancia propia? (para el indicador y el filtro)
+        $todas->each(fn ($c) => $c->setAttribute('mi_constancia',
+            $c->constancias->contains(fn ($k) => $k->profesores->contains('Id', $u->Id))));
 
         $conteo = $todas->groupBy('IdEstado')->map->count();
-        $lista  = $r->filled('estado') ? $todas->where('IdEstado', (int) $r->estado) : $todas;
+
+        $lista = $todas
+            ->when($r->filled('estado'), fn ($l) => $l->where('IdEstado', (int) $r->estado))
+            ->when($r->constancia === 'con', fn ($l) => $l->where('mi_constancia', true))
+            ->when($r->constancia === 'sin', fn ($l) => $l->where('mi_constancia', false))
+            ->when($r->filled('desde'), fn ($l) => $l->filter(fn ($c) => $c->FechaInicio && $c->FechaInicio->toDateString() >= $r->desde))
+            ->when($r->filled('hasta'), fn ($l) => $l->filter(fn ($c) => $c->FechaInicio && $c->FechaInicio->toDateString() <= $r->hasta))
+            ->when($r->fecha === 'sin', fn ($l) => $l->filter(fn ($c) => !$c->FechaFin));
 
         return view('profesor.panel', [
             'comisiones' => $lista->values(),
@@ -68,7 +80,7 @@ class ProfesorController extends Controller
         return back()->with('ok', 'Constancia refutada; se avisó a Secretaría.');
     }
 
-    /** $doc: oficio | constancia · $formato: vista (HTML) | pdf */
+    /** $formato: vista (HTML) | pdf */
     public function oficio(Request $r, int $id, string $formato)
     {
         $c = $this->mia($r, $id)->load('facultad');
