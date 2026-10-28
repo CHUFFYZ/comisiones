@@ -48,7 +48,7 @@
 
 <div class="meta">
     {{ $p->Lugar }}, a {{ $fechaDoc }}.<br>
-    <strong>Oficio no.</strong> {{ $c->NOficio }}<br>
+    <strong>{{ $esConstancia ? 'En referencia a Oficio no.' : 'Oficio no.' }}</strong> {{ $c->NOficio }}<br>
     <strong>Asunto:</strong> {{ $asunto }}
 </div>
 
