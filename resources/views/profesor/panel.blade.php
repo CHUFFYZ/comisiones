@@ -11,14 +11,12 @@
 
     <form method="GET" class="d-flex flex-wrap gap-2 align-items-center mb-4">
         {{-- Estado --}}
-        <div class="btn-group flex-wrap" role="group" aria-label="Estado">
-            <input type="radio" class="btn-check" name="estado" id="est0" value="" onchange="this.form.submit()" @checked(!request('estado'))>
-            <label class="btn btn-outline-primary btn-sm" for="est0">Todas ({{ $total }})</label>
+         <select name="estado" class="form-select rounded-pill w-auto" onchange="this.form.submit()">
+            <option value="">Todos los estados</option>
             @foreach ($estados as $e)
-                <input type="radio" class="btn-check" name="estado" id="est{{ $e->Id }}" value="{{ $e->Id }}" onchange="this.form.submit()" @checked(request('estado') == $e->Id)>
-                <label class="btn btn-outline-primary btn-sm" for="est{{ $e->Id }}">{{ $e->Nombre }} ({{ $conteo[$e->Id] ?? 0 }})</label>
+                <option value="{{ $e->Id }}" @selected(request('estado') == $e->Id)>{{ $e->Nombre }}</option>
             @endforeach
-        </div>
+        </select>
 
         <select name="constancia" class="form-select rounded-pill w-auto" onchange="this.form.submit()">
             <option value="">Con y sin constancia</option>
