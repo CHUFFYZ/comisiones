@@ -21,7 +21,7 @@
     <form method="GET" class="d-flex flex-wrap gap-2 align-items-center mb-3">
         <div class="input-group rounded-pill w-auto">
             <span class="input-group-text bg-transparent"><i class="fa-solid fa-magnifying-glass"></i></span>
-            <input type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Oficio, asunto o profesor">
+            <input type="search" name="q" value="{{ request('q') }}" class="form-control" placeholder="Comisión, asunto o profesor">
         </div>
         <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis align-self-center px-3 py-2"><i class="fa-solid fa-layer-group me-1"></i>Total: {{ $totalAlcance }}</span>
         @if ($comisiones->total() !== $totalAlcance)<span class="small text-body-secondary align-self-center">{{ $comisiones->total() }} coincidencias</span>@endif
@@ -62,7 +62,7 @@
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>Oficio</th>
+                        <th>Comisión</th>
                         <th>Asunto</th>
                         <th class="d-none d-lg-table-cell">Tipo</th>
                         <th class="d-none d-md-table-cell">Profesores</th>
@@ -82,7 +82,7 @@
                         <td class="d-none d-md-table-cell text-nowrap">
                             {{ $c->FechaInicio->format('d/m/y') }}@if ($c->FechaFin) – {{ $c->FechaFin->format('d/m/y') }}@else <span class="text-body-tertiary">· sin fecha final</span>@endif
                         </td>
-                        <td><span class="badge rounded-pill badge-estado {{ $c->clase_estado }}">{{ $c->estado->Nombre }}</span></td>
+                        <td><span class="badge rounded-pill badge-estado {{ $c->clase_estado }}">{{ $c->estado->Nombre }}</span>@if ($c->esta_cerrada) <span class="badge rounded-pill bg-dark" title="Cerrada"><i class="fa-solid fa-lock"></i></span>@endif</td>
                         <td>
                             @php $ec = $c->estado_constancias; @endphp
                             @if ($ec === 'completa')
@@ -98,10 +98,15 @@
 
                         @if ($anuladas)
                             <td>
-                                <div class="d-flex justify-content-end">
+                                <div class="d-flex justify-content-end gap-2">
                                     <form action="{{ route('comisiones.restaurar', $c->Id) }}" method="POST" class="m-0">
                                         @csrf @method('PATCH')
                                         <button class="btn btn-ghost is-success btn-sm"><i class="fa-solid fa-rotate-left me-1"></i> Revertir</button>
+                                    </form>
+                                    <form action="{{ route('comisiones.eliminar_definitivo', $c->Id) }}" method="POST" class="m-0" data-confirm-boton="Eliminar definitivamente"
+                                          data-doble-confirm="¿Eliminar definitivamente la comisión {{ $c->NOficio }}? Se borrarán sus constancias, reportes y archivos.|||ÚLTIMA CONFIRMACIÓN: esta acción NO se puede deshacer. ¿Eliminar {{ $c->NOficio }} para siempre?">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-ghost is-danger btn-sm"><i class="fa-solid fa-trash me-1"></i> Eliminar</button>
                                     </form>
                                 </div>
                             </td>

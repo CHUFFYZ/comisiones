@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cati-extra.css') }}">
 
+    <link rel="stylesheet" href="{{ asset('css/cati-mejoras.css') }}">
     @stack('styles')
 </head>
 <body>
@@ -171,6 +172,8 @@
         @if (session('ok')) showToast(@json(session('ok')), 'success'); @endif
         @if ($errors->has('general')) showToast(@json($errors->first('general')), 'error'); @endif
     </script>
+
+    @include('components.mejoras')
 
     @stack('scripts')
 </body>

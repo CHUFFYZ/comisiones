@@ -59,6 +59,14 @@
                                 </a>
                             </li>
                         @endif
+                        @if ($puedeSimular && !$simulado)
+                            <li class="nav-item mb-1">
+                                <a href="{{ route('su.desbloquear') }}" class="nav-link py-2 small {{ request()->routeIs('su.*') ? 'active' : '' }}">
+                                    <i class="fa-solid fa-user-shield w-20px"></i>
+                                    <span>Zona de super usuario</span>
+                                </a>
+                            </li>
+                        @endif
                         @if ($puedeFirmar)
                             <li class="nav-item mb-1">
                                 <a href="{{ route('firmas.index') }}" class="nav-link py-2 small {{ request()->routeIs('firmas.*') ? 'active' : '' }}">

@@ -35,7 +35,10 @@ class FirmaService
         return $v;
     }
 
-    /** $accion: firma | sello | ambos | retirar · $modo: propio | director (el superusuario siempre firma como Director de la facultad del documento) */
+    /**
+     * $accion: firma | sello | ambos | retirar | retirar_firma | retirar_sello
+     * $modo: propio | director (el superusuario siempre firma como Director de la facultad del documento)
+     */
     public function aplicar(Usuario $u, Model $doc, string $accion, string $modo): void
     {
         $this->falla(!$this->acc->puedeFirmar($u), 'No tienes permiso para firmar.');
@@ -44,9 +47,10 @@ class FirmaService
         $c = $doc instanceof Constancia ? $doc->comision : $doc;
         $this->falla(!$esSU && (int) $c->IdFacultad !== (int) $u->IdFacultad, 'El documento es de otra facultad.');
         $this->falla($c->DeletedAt !== null, "La comisión {$c->NOficio} está anulada.");
+        $this->falla($c->esta_cerrada, "La comisión {$c->NOficio} está cerrada: no se puede firmar ni retirar firmas.");
 
-        if ($accion === 'retirar') {
-            $this->retirar($u, $doc, $c);
+        if (str_starts_with($accion, 'retirar')) {
+            $this->retirar($u, $doc, $c, $accion);
             return;
         }
 
@@ -82,16 +86,43 @@ class FirmaService
 
         $doc->update($v);
         $this->regenerar($doc);
-        $this->notif->firmado($c, $u, ($doc instanceof Constancia ? 'Constancia' : 'Oficio') . ' ' . ($firma && $sello ? 'firmado y sellado' : ($firma ? 'firmado' : 'sellado')));
+
+        $esK = $doc instanceof Constancia;
+        $this->notif->firmado($c, $u, ($esK ? 'Constancia' : 'Comisión') . ' ' . ($firma && $sello ? 'firmada y sellada' : ($firma ? 'firmada' : 'sellada')));
+
+        // Al quedar firmada y sellada por completo, los profesores ya pueden verla
+        $doc->refresh();
+        if ($doc->firmado && $doc->sellado) {
+            if ($esK) {
+                $this->notif->constanciaDisponible($c, $doc->Id, $doc->profesores()->pluck('usuario.Id'));
+            } else {
+                $this->notif->asignacion($c, $c->profesores()->pluck('usuario.Id'));
+            }
+        }
     }
 
-    private function retirar(Usuario $u, Model $doc, $c): void
+    private function retirar(Usuario $u, Model $doc, $c, string $accion): void
     {
+        $quitaF = in_array($accion, ['retirar', 'retirar_firma'], true);
+        $quitaS = in_array($accion, ['retirar', 'retirar_sello'], true);
+
         if ($u->Rol === 'SecretariaAcademica') {
-            $ajena = collect([$doc->FirmaPor, $doc->SelloPor])->filter()->contains(fn ($i) => (int) $i !== (int) $u->Id);
+            $ajena = collect([$quitaF ? $doc->FirmaPor : null, $quitaS ? $doc->SelloPor : null])->filter()
+                ->contains(fn ($i) => (int) $i !== (int) $u->Id);
             $this->falla($ajena, "{$c->NOficio}: solo el Director puede retirar lo que él firmó.");
         }
-        $doc->update($this->limpio($c->IdFacultad) + ['UpdatedBy' => $u->Matricula]);
+
+        $v = ['UpdatedBy' => $u->Matricula];
+        if ($quitaF) $v += ['DirectorFirmaUrl' => null, 'FirmaAt' => null, 'FirmaPor' => null];
+        if ($quitaS) $v += ['DirectorSelloUrl' => null, 'SelloAt' => null, 'SelloPor' => null];
+
+        $quedaF = $quitaF ? false : $doc->firmado;
+        $quedaS = $quitaS ? false : $doc->sellado;
+        if (!$quedaF && !$quedaS) {
+            $v = $this->limpio($c->IdFacultad) + ['UpdatedBy' => $u->Matricula];
+        }
+
+        $doc->update($v);
         $this->regenerar($doc);
     }
 

@@ -9,7 +9,7 @@
     <div class="mb-4">
         <h2 class="font-syne text-dark mb-1">{{ $edit ? 'Editar comisión ' . $comision->NOficio : 'Nueva comisión' }}</h2>
         <p class="text-muted small mb-0">
-            {{ $edit ? 'Al guardar se reescribe el oficio guardado.' : 'El número de oficio se genera automáticamente.' }}
+            {{ $edit ? 'Al guardar se reescribe el documento de la comisión.' : 'El número de comisión se genera automáticamente.' }}
             La vista previa se actualiza mientras escribes.
         </p>
     </div>
@@ -110,10 +110,10 @@
         <div class="col-xl-6">
             <div class="card p-3 sticky-previa">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="font-syne mb-0"><i class="fa-solid fa-eye me-1"></i> Vista previa del oficio</h6>
+                    <h6 class="font-syne mb-0"><i class="fa-solid fa-eye me-1"></i> Vista previa de la comisión</h6>
                     <span id="previaCarga" class="spinner-border spinner-border-sm text-secondary d-none" role="status"></span>
                 </div>
-                <iframe id="previa" class="doc-frame" title="Vista previa del oficio"></iframe>
+                <iframe id="previa" class="doc-frame" title="Vista previa de la comisión"></iframe>
             </div>
         </div>
     </div>

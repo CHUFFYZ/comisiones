@@ -39,7 +39,7 @@
                 <div id="prof{{ $p->Id }}" class="accordion-collapse collapse" data-bs-parent="#accProfes">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
-                            <thead><tr><th>Oficio</th><th>Asunto</th><th class="d-none d-md-table-cell">Tipo</th><th class="d-none d-md-table-cell">Fechas</th><th>Estado</th></tr></thead>
+                            <thead><tr><th>Comisión</th><th>Asunto</th><th class="d-none d-md-table-cell">Tipo</th><th class="d-none d-md-table-cell">Fechas</th><th>Estado</th></tr></thead>
                             <tbody>
                             @forelse ($lista as $c)
                                 <tr class="fila-click" data-href="{{ route('comisiones.show', $c->Id) }}">
@@ -100,7 +100,7 @@
                     ? `<img src="${escapeHtml(profile.foto)}" alt="" class="chat-avatar chat-avatar--xl">`
                     : `<span class="chat-avatar chat-avatar--ini chat-avatar--xl">${escapeHtml(profile.nombreCompleto.charAt(0).toUpperCase())}</span>`;
                 document.getElementById('perfilProfesorBody').innerHTML = `
-                    <div class="mb-3">${avatar}</div>
+                    <div class="mb-3"><span role="button" data-ampliar="${escapeHtml(profile.foto || '')}" class="d-inline-block">${avatar}</span></div>
                     <h5 class="font-syne mb-1">${escapeHtml(profile.nombreCompleto)}</h5>
                     <div class="mb-3">
                         <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis">${escapeHtml(profile.rol)}</span>

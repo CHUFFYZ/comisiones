@@ -26,6 +26,12 @@ class NotificacionService
         }
     }
 
+    /** Aviso al usuario que lanzó un proceso (firmas, constancias, etc.) cuando termina. */
+    public function proceso(int $idUsuario, string $titulo, ?string $mensaje = null, ?string $url = null): void
+    {
+        $this->enviar([$idUsuario], 'proceso', $titulo, $mensaje, $url);
+    }
+
     /* ───────── destinatarios ───────── */
 
     /** Quien elaboró la comisión + Secretaría Académica de la facultad. */
@@ -38,17 +44,19 @@ class NotificacionService
         return $ids->push($creador)->filter()->unique()->values();
     }
 
+    /** Los profesores solo se enteran (y ven la comisión) cuando está firmada y sellada. */
     private function profesores(Comision $c): Collection
     {
-        return $c->profesores()->pluck('usuario.Id');
+        return ($c->firmado && $c->sellado) ? $c->profesores()->pluck('usuario.Id') : collect();
     }
 
     /* ───────── eventos ───────── */
 
+    /** Se envía cuando la comisión queda firmada y sellada (una sola vez por profesor). */
     public function asignacion(Comision $c, iterable $profesorIds): void
     {
         $this->enviar($profesorIds, 'asignacion', 'Nueva comisión asignada',
-            "Se te asignó la comisión {$c->NOficio}: {$c->Asunto}", route('profesor.show', $c->Id));
+            "Se te asignó la comisión {$c->NOficio}: {$c->Asunto}", route('profesor.show', $c->Id), "asig:{$c->Id}");
     }
 
     /** Avisa a profesores y secretaría (menos a quien hizo el cambio). */
@@ -69,11 +77,11 @@ class NotificacionService
         }
     }
 
-    public function constancia(Comision $c, Usuario $actor, string $accion, ?iterable $ids = null): void
+    /** Constancia disponible para el profesor (ya firmada y sellada). */
+    public function constanciaDisponible(Comision $c, int $idConstancia, iterable $profesorIds): void
     {
-        $dest = $ids !== null ? collect($ids) : $this->profesores($c);
-        $this->enviar($dest->reject(fn ($id) => (int) $id === (int) $actor->Id),
-            'constancia', "Constancia {$accion}", "Comisión {$c->NOficio}", route('profesor.show', $c->Id));
+        $this->enviar($profesorIds, 'constancia', 'Constancia disponible', "Comisión {$c->NOficio}",
+            route('profesor.show', $c->Id), "const:{$idConstancia}");
     }
 
     public function porFirmar(Comision $c, string $que): void
@@ -88,6 +96,7 @@ class NotificacionService
         $this->enviar($this->secretaria($c)->reject(fn ($id) => (int) $id === (int) $actor->Id),
             'firma', $titulo, "{$c->NOficio}: {$c->Asunto}", route('comisiones.show', $c->Id));
     }
+
     /** Avisa de comisiones por vencer (≤ 2 días) o vencidas sin finalizar. Una vez por comisión/fecha. */
     public function vencimientos(): void
     {
@@ -102,7 +111,7 @@ class NotificacionService
                 $texto   = "{$c->NOficio} " . ($vencida ? 'venció el ' : 'vence el ') . $c->FechaFin->format('d/m/y');
                 $titulo  = $vencida ? 'Comisión vencida' : 'Comisión por vencer';
 
-                $profes = $c->profesores->pluck('Id');
+                $profes = ($c->firmado && $c->sellado) ? $c->profesores->pluck('Id') : collect();
                 $this->enviar($profes, 'vencimiento', $titulo, $texto, route('profesor.show', $c->Id), $clave);
                 $this->enviar($this->secretaria($c)->diff($profes), 'vencimiento', $titulo, $texto, route('comisiones.show', $c->Id), $clave);
             });

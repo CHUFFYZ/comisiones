@@ -87,7 +87,7 @@
         <div class="col">
             <div class="card stat-card h-100">
                 <div class="d-flex align-items-center justify-content-between">
-                    <div><div class="stat-num">{{ $pendFirma['comisiones']['n'] }}</div><div class="stat-label">Oficios sin firma o sello</div></div>
+                    <div><div class="stat-num">{{ $pendFirma['comisiones']['n'] }}</div><div class="stat-label">Comisiones sin firma o sello</div></div>
                     <div class="stat-icon estado-no-iniciado"><i class="fa-solid fa-signature"></i></div>
                 </div>
             </div>
@@ -162,7 +162,7 @@
     <div class="row g-3">
         <div class="col-lg-6">
             <div class="card h-100">
-                <div class="card-header bg-white border-0 pt-3 px-4 font-syne fw-bold">Oficios sin firma o sello</div>
+                <div class="card-header bg-white border-0 pt-3 px-4 font-syne fw-bold">Comisiones sin firma o sello</div>
                 <div class="list-group list-group-flush">
                     @forelse ($pendFirma['comisiones']['lista'] as $c)
                         <a href="{{ route('comisiones.show', $c->Id) }}" class="list-group-item list-group-item-action px-4 small d-flex justify-content-between align-items-center gap-2">
@@ -170,7 +170,7 @@
                             <span class="text-nowrap">@include('firmas.partials.estado', ['d' => $c])</span>
                         </a>
                     @empty
-                        <div class="px-4 py-4 small text-body-secondary">Todos los oficios están firmados y sellados.</div>
+                        <div class="px-4 py-4 small text-body-secondary">Todas las comisiones están firmadas y selladas.</div>
                     @endforelse
                 </div>
             </div>

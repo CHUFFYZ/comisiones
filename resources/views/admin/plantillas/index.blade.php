@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', 'Plantillas de oficio · CATI')
+@section('title', 'Plantillas de documentos · CATI')
 
 @section('content')
 <div class="container-fluid p-0">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            <h2 class="font-syne text-dark mb-1">Plantillas de oficio</h2>
+            <h2 class="font-syne text-dark mb-1">Plantillas de documentos</h2>
             <p class="text-muted small mb-0">Encabezado, introducción y cierre de cada tipo de documento. Puedes crear tipos nuevos.</p>
         </div>
         <a href="{{ route('admin.plantillas.create') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1"></i> Nueva plantilla</a>

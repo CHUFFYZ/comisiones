@@ -24,6 +24,7 @@ class Comision extends ModeloCati
         'FechaFin'     => 'date',
         'ReporteAt'    => 'datetime',
         'DeletedAt'    => 'datetime',
+        'CerradaAt'    => 'datetime',
         'FirmaAt'      => 'datetime', 'SelloAt' => 'datetime',
     ];
 
@@ -32,6 +33,7 @@ class Comision extends ModeloCati
     public function plantilla()      { return $this->belongsTo(PlantillaDocumento::class, 'IdPlantilla', 'Id'); }
     public function facultad()       { return $this->belongsTo(Facultad::class, 'IdFacultad', 'Id'); }
     public function reporteUsuario() { return $this->belongsTo(Usuario::class, 'ReporteIdUsuario', 'Id'); }
+    public function cierreUsuario()  { return $this->belongsTo(Usuario::class, 'CerradaPor', 'Id'); }
     public function profesores()     { return $this->belongsToMany(Usuario::class, 'comision_profesor', 'IdComision', 'IdUsuario'); }
     public function constancias() { return $this->hasMany(Constancia::class, 'IdComision', 'Id')->where('Activo', 1); }
     public function logs()           { return $this->hasMany(ComisionLog::class, 'IdComision', 'Id')->orderByDesc('Id'); }
@@ -54,6 +56,12 @@ class Comision extends ModeloCati
     public function getEstaAnuladaAttribute(): bool
     {
         return $this->DeletedAt !== null;
+    }
+
+    /** Cerrada: ya no puede modificarse (solo el super usuario la reabre). */
+    public function getEstaCerradaAttribute(): bool
+    {
+        return (int) ($this->Cerrada ?? 0) === 1;
     }
 
     /** Descripción del rechazo/refutación vigente (solo estados 4 y 5). */

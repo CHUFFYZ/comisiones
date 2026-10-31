@@ -1,0 +1,11 @@
+/* Foto ampliada: tamaño fijo sin importar el tamaño original */
+.visor-foto img {
+    width: min(86vw, 520px); height: min(86vw, 520px);
+    max-width: none; max-height: none;
+    object-fit: cover; background: #fff; border-radius: 16px;
+}
+/* Pantalla de carga */
+.cargando-fondo { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(18, 27, 40, .65);
+                  backdrop-filter: blur(3px); align-items: center; justify-content: center; }
+.cargando-fondo.activo { display: flex; }
+.cargando-caja { background: #fff; border-radius: 16px; padding: 1.5rem 2rem; text-align: center; max-width: 340px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }

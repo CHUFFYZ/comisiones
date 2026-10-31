@@ -8,7 +8,7 @@
 <div class="container-fluid p-0">
     <div class="mb-4">
         <h2 class="font-syne text-dark mb-1">{{ $edit ? 'Editar plantilla #' . $p->Id : 'Nueva plantilla' }}</h2>
-        <p class="text-muted small mb-0">El texto del oficio se arma así: <em>introducción</em> + <strong>contexto de la comisión</strong> + <em>cierre</em> (las fechas se agregan solas al final del cierre).</p>
+        <p class="text-muted small mb-0">El texto del documento se arma así: <em>introducción</em> + <strong>contexto de la comisión</strong> + <em>cierre</em> (las fechas se agregan solas al final del cierre).</p>
     </div>
 
     @if ($errors->any() && !$errors->has('general'))

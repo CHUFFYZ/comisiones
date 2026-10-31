@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class ComisionService
@@ -34,10 +36,29 @@ class ComisionService
         return in_array($u->Rol, ['SecretariaAcademica', 'Administrador'], true) || $this->acceso->esSuperUsuario($u);
     }
 
+    /** Tipos (áreas) del usuario: los suyos + los que otorgan sus niveles de acceso (permanentes y temporales vigentes). */
+    public function idsTipos(Usuario $u): Collection
+    {
+        $propios = $u->tiposComision()->pluck('tipo_comision.Id');
+
+        $niveles = collect();
+        foreach ($u->asignaciones as $a) {
+            if ($a->IdNivelAcceso) $niveles->push($a->IdNivelAcceso);
+            if ($a->tempVigente() && $a->IdNivelAccesoTemp) $niveles->push($a->IdNivelAccesoTemp);
+        }
+        $deNivel = $niveles->isEmpty() ? collect()
+            : DB::table('nivel_acceso_tipo_comision as nt')
+                ->join('nivel_acceso as n', 'n.Id', '=', 'nt.IdNivelAcceso')
+                ->whereIn('nt.IdNivelAcceso', $niveles->unique()->all())->where('n.Activo', 1)
+                ->pluck('nt.IdTipoComision');
+
+        return $propios->merge($deNivel)->map(fn ($i) => (int) $i)->unique()->values();
+    }
+
     public function tiposPermitidos(Usuario $u): Collection
     {
         return TipoComision::where('Activo', 1)
-            ->when(!$this->veTodo($u), fn ($q) => $q->whereIn('Id', $u->tiposComision()->pluck('tipo_comision.Id')))
+            ->when(!$this->veTodo($u), fn ($q) => $q->whereIn('Id', $this->idsTipos($u)))
             ->orderBy('Nombre')->get();
     }
 
@@ -56,7 +77,7 @@ class ComisionService
             $q->where('IdFacultad', $u->IdFacultad);
         }
         if (!$this->veTodo($u)) {
-            $q->whereIn('IdTipoComision', $u->tiposComision()->pluck('tipo_comision.Id'));
+            $q->whereIn('IdTipoComision', $this->idsTipos($u));
         }
 
         return $q;
@@ -73,13 +94,33 @@ class ComisionService
         return $q->orderByDesc('Id');
     }
 
-    /** Comisiones asignadas al profesor (solo o en grupo). */
+    /**
+     * Comisiones asignadas al profesor (solo o en grupo).
+     * Solo se ven cuando la comisión está firmada y sellada; lo mismo aplica a sus constancias.
+     */
     public function delProfesor(Usuario $u): Builder
     {
+        $completa = fn ($q) => $q->whereNotNull('FirmaAt')->whereNotNull('SelloAt');
+
         return Comision::query()->whereNull('DeletedAt')
+            ->whereNotNull('FirmaAt')->whereNotNull('SelloAt')
             ->whereHas('profesores', fn ($q) => $q->where('usuario.Id', $u->Id))
-            ->with(['tipo', 'estado', 'profesores', 'constancias.profesores', 'facultad'])
+            ->with([
+                'tipo', 'estado', 'profesores', 'facultad',
+                'constancias' => $completa,
+                'constancias.profesores',
+            ])
             ->orderByDesc('Id');
+    }
+
+    /* ───────── bloqueo por cierre ───────── */
+
+    private function bloquear(Comision $c): void
+    {
+        if ($c->esta_cerrada) {
+            throw ValidationException::withMessages(['general' =>
+                "La comisión {$c->NOficio} está cerrada y no puede modificarse. Solo el super usuario puede reabrirla."]);
+        }
     }
 
     /* ───────── crear / modificar ───────── */
@@ -115,15 +156,16 @@ class ComisionService
 
         $c->load(['facultad', 'tipo', 'profesores', 'plantilla']);
         $this->docs->guardarOficio($c);
-        $this->notif->asignacion($c, $c->profesores->pluck('Id'));
-        $this->notif->porFirmar($c, 'Oficio');
+        // Los profesores se enteran (y la ven en su panel) hasta que esté firmada y sellada.
+        $this->notif->porFirmar($c, 'Comisión');
+        $this->notif->proceso($u->Id, 'Comisión creada', "{$c->NOficio}: {$c->Asunto}", route('comisiones.show', $c->Id));
 
         return $c;
     }
 
     public function actualizar(Usuario $u, Comision $c, array $d): Comision
     {
-        $antes = $c->profesores()->pluck('usuario.Id')->map(fn ($i) => (int) $i);
+        $this->bloquear($c);
         $teniaFirma = $c->firmado || $c->sellado;
 
         DB::transaction(function () use ($u, $c, $d, $teniaFirma) {
@@ -149,13 +191,9 @@ class ComisionService
         }
         if ($teniaFirma) {
             $this->log($c, $u, 'Firma retirada por modificación');
-            $this->notif->porFirmar($c, 'Oficio');
+            $this->notif->porFirmar($c, 'Comisión');
         }
-
-        $nuevos = collect($d['profesores'])->map(fn ($i) => (int) $i)->diff($antes);
-        if ($nuevos->isNotEmpty()) {
-            $this->notif->asignacion($c, $nuevos);
-        }
+        $this->notif->proceso($u->Id, 'Comisión actualizada', "{$c->NOficio}: {$c->Asunto}", route('comisiones.show', $c->Id));
 
         return $c;
     }
@@ -199,6 +237,7 @@ class ComisionService
     /** Secretaría: 1→2→3 (solo estados principales). */
     public function avanzar(Usuario $u, Comision $c): void
     {
+        $this->bloquear($c);
         abort_unless(in_array((int) $c->IdEstado, [1, 2], true), 422, 'No se puede avanzar desde este estado.');
         $this->cambiar($c, $u, (int) $c->IdEstado + 1, 'Estado avanzado');
     }
@@ -206,6 +245,7 @@ class ComisionService
     /** 3→2→1; si está rechazado/refutado vuelve a Finalizado. */
     public function retroceder(Usuario $u, Comision $c): void
     {
+        $this->bloquear($c);
         $nuevo = match ((int) $c->IdEstado) {
             2 => 1, 3 => 2, 4, 5 => 3,
             default => abort(422, 'La comisión ya está en el primer estado.'),
@@ -216,6 +256,7 @@ class ComisionService
     /** Profesor: Iniciado → En proceso. */
     public function iniciar(Usuario $u, Comision $c): void
     {
+        $this->bloquear($c);
         abort_unless((int) $c->IdEstado === 1, 422, 'La comisión ya fue iniciada.');
         $this->cambiar($c, $u, 2, 'Comisión iniciada');
     }
@@ -226,6 +267,7 @@ class ComisionService
      */
     public function enviarReporte(Usuario $u, Comision $c, UploadedFile $f): void
     {
+        $this->bloquear($c);
         abort_if((int) $c->IdEstado === 1, 422, 'Primero marca la comisión como En proceso.');
 
         $estabaRechazado = (int) $c->IdEstado === 4;
@@ -241,6 +283,7 @@ class ComisionService
     /** Secretaría: rechaza el reporte con descripción → Rechazado. */
     public function rechazarReporte(Usuario $u, Comision $c, string $motivo): void
     {
+        $this->bloquear($c);
         abort_unless((int) $c->IdEstado === 3 && $c->ReporteRuta, 422, 'No hay un reporte finalizado que rechazar.');
         $this->cambiar($c, $u, 4, 'Reporte rechazado', $motivo);
     }
@@ -248,6 +291,7 @@ class ComisionService
     /** Profesor: refuta la constancia con descripción → Refutado. */
     public function refutarConstancia(Usuario $u, Comision $c, string $motivo): void
     {
+        $this->bloquear($c);
         abort_unless(
             (int) $c->IdEstado === 3 && $c->constancias->contains(fn ($k) => $k->profesores->contains('Id', $u->Id)),
             422, 'No hay una constancia tuya que refutar.'
@@ -257,6 +301,7 @@ class ComisionService
 
     public function anular(Usuario $u, Comision $c): void
     {
+        $this->bloquear($c);
         $c->update(['Activo' => 0, 'DeletedAt' => now(), 'DeletedBy' => $u->Matricula]);
         $this->log($c, $u, 'Comisión anulada');
     }
@@ -265,6 +310,75 @@ class ComisionService
     {
         $c->update(['Activo' => 1, 'DeletedAt' => null, 'DeletedBy' => null, 'UpdatedBy' => $u->Matricula]);
         $this->log($c, $u, 'Anulación revertida');
+    }
+
+    /**
+     * Borrado definitivo: comisión, constancias, reportes y carpeta de archivos.
+     * Solo comisiones anuladas (el super usuario puede forzarlo, incluso cerradas).
+     */
+    public function eliminarDefinitivo(Usuario $u, Comision $c, bool $forzar = false): void
+    {
+        if (!$forzar) {
+            $this->bloquear($c);
+            if (!$c->esta_anulada) {
+                throw ValidationException::withMessages(['general' => 'Solo se pueden eliminar definitivamente comisiones anuladas.']);
+            }
+        }
+
+        $c->loadMissing('facultad');
+        $carpeta = $this->docs->carpeta($c);
+        $oficio  = $c->NOficio;
+
+        DB::transaction(function () use ($c) {
+            $ids = Constancia::where('IdComision', $c->Id)->pluck('Id');   // incluye las dadas de baja
+            DB::table('constancia_profesor')->whereIn('IdConstancia', $ids)->delete();
+            Constancia::whereIn('Id', $ids)->delete();
+            DB::table('comision_log')->where('IdComision', $c->Id)->delete();
+            DB::table('comision_profesor')->where('IdComision', $c->Id)->delete();
+            $c->delete();
+        });
+
+        Storage::disk('local')->deleteDirectory($carpeta);   // oficio, constancias y reportes
+        Log::info("Comisión {$oficio} eliminada definitivamente por {$u->Matricula}");
+    }
+
+    /* ───────── cierre ───────── */
+
+    /** null = se puede cerrar; si no, el motivo. */
+    public function motivoNoCerrable(Comision $c): ?string
+    {
+        $c->loadMissing(['profesores', 'constancias.profesores']);
+
+        if ($c->esta_anulada)                       return 'Está anulada.';
+        if ($c->esta_cerrada)                       return 'Ya está cerrada.';
+        if ((int) $c->IdEstado !== 3)               return 'Debe estar finalizada.';
+        if (!$c->firma_completa)                    return 'La comisión no está firmada y sellada.';
+        if ($c->estado_constancias !== 'completa')  return 'Faltan constancias de algún profesor.';
+        if ($c->constancias->contains(fn ($k) => !$k->firma_completa)) return 'Hay constancias sin firma o sello.';
+
+        return null;
+    }
+
+    public function cerrar(Usuario $u, Comision $c): void
+    {
+        if ($m = $this->motivoNoCerrable($c)) {
+            throw ValidationException::withMessages(['general' => "{$c->NOficio}: $m"]);
+        }
+        $c->update(['Cerrada' => 1, 'CerradaAt' => now(), 'CerradaPor' => $u->Id, 'UpdatedBy' => $u->Matricula]);
+        $this->log($c, $u, 'Comisión cerrada');
+
+        $dest = $c->profesores->pluck('Id')->merge($this->notif->secretaria($c))->unique();
+        $this->notif->enviar($dest->reject(fn ($id) => (int) $id === (int) $u->Id), 'cierre', 'Comisión cerrada',
+            "{$c->NOficio} quedó cerrada: ya no puede modificarse.", route('comisiones.show', $c->Id));
+    }
+
+    /** Solo super usuario (lo valida el controlador). */
+    public function reabrir(Usuario $u, Comision $c): void
+    {
+        $c->update(['Cerrada' => 0, 'CerradaAt' => null, 'CerradaPor' => null, 'UpdatedBy' => $u->Matricula]);
+        $this->log($c, $u, 'Comisión reabierta por super usuario');
+        $this->notif->enviar($this->notif->secretaria($c), 'cierre', 'Comisión reabierta',
+            "{$c->NOficio} fue reabierta y puede modificarse de nuevo.", route('comisiones.show', $c->Id));
     }
 
     private function cambiar(Comision $c, Usuario $u, int $estado, string $accion, ?string $desc = null): void
@@ -291,6 +405,7 @@ class ComisionService
     /** $modo: grupo = una constancia con todos los elegidos · individual = una por profesor. */
     public function crearConstancias(Usuario $u, Comision $c, array $ids, string $modo): Collection
     {
+        $this->bloquear($c);
         abort_unless((int) $c->IdEstado === 3, 422, 'La comisión debe estar finalizada.');
         $c->loadMissing(['profesores', 'constancias.profesores', 'facultad']);
 
@@ -328,8 +443,9 @@ class ComisionService
 
         $nombres = $c->profesores->whereIn('Id', $ids->all())->map(fn ($p) => $p->nombre_corto)->join(', ');
         $this->log($c, $u, 'Constancia generada', ($modo === 'grupo' ? 'Grupal' : 'Individual') . ": $nombres");
-        $this->notif->constancia($c, $u, 'generada', $ids);
+        // Los profesores reciben aviso cuando la constancia esté firmada y sellada.
         $this->notif->porFirmar($c, 'Constancia');
+        $this->notif->proceso($u->Id, 'Constancias generadas', "{$c->NOficio}: {$creadas->count()} constancia(s) lista(s) para firma.", route('comisiones.show', $c->Id));
 
         return $creadas;
     }
@@ -337,6 +453,7 @@ class ComisionService
     /** Modifica las constancias seleccionadas (ids de constancia). */
     public function actualizarConstancias(Usuario $u, Comision $c, array $ids, string $contexto, ?string $cierre = null): int
     {
+        $this->bloquear($c);
         $c->loadMissing(['facultad', 'constancias.profesores']);
         $ks = $c->constancias->whereIn('Id', array_map('intval', $ids));
         abort_if($ks->isEmpty(), 404, 'No se encontraron las constancias seleccionadas.');
@@ -357,14 +474,15 @@ class ComisionService
         } else {
             $this->log($c, $u, 'Constancia modificada', $ks->count() . ' constancia(s)');
         }
-        $this->notif->constancia($c, $u, 'actualizada', $ks->flatMap(fn ($k) => $k->profesores->pluck('Id'))->unique());
         $this->notif->porFirmar($c, 'Constancia');
+        $this->notif->proceso($u->Id, 'Constancias actualizadas', "{$c->NOficio}: {$ks->count()} constancia(s) por firmar.", route('comisiones.show', $c->Id));
 
         return $ks->count();
     }
 
     public function eliminarConstancias(Usuario $u, Comision $c, array $ids): int
     {
+        $this->bloquear($c);
         $c->loadMissing(['facultad', 'constancias.profesores']);
         $ks = $c->constancias->whereIn('Id', array_map('intval', $ids));
         abort_if($ks->isEmpty(), 404, 'No se encontraron las constancias seleccionadas.');

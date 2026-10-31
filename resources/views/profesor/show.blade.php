@@ -50,7 +50,9 @@
                     <p class="small text-body-secondary mb-3">Aún no hay reporte.</p>
                 @endif
 
-                @if ($c->IdEstado == 1)
+                @if ($c->esta_cerrada)
+                    <p class="small text-body-secondary mb-0"><i class="fa-solid fa-lock me-1"></i>Comisión cerrada: solo consulta.</p>
+                @elseif ($c->IdEstado == 1)
                     <form action="{{ route('profesor.iniciar', $c->Id) }}" method="POST">
                         @csrf @method('PATCH')
                         <button class="btn btn-primary btn-sm"><i class="fa-solid fa-play me-1"></i> Marcar como En proceso</button>
@@ -78,13 +80,13 @@
 
             <div class="card p-4">
                 <ul class="nav nav-tabs mb-3" role="tablist">
-                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabOficio" type="button">Oficio</button></li>
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabOficio" type="button">Comisión</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabConstancia" type="button">Constancia</button></li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tabOficio">
-                        <a href="{{ route('profesor.oficio', [$c->Id, 'pdf']) }}" target="_blank" class="btn btn-ghost is-brand btn-sm mb-3"><i class="fa-solid fa-file-pdf me-1"></i> Oficio PDF</a>
-                        <iframe class="doc-frame" src="{{ route('profesor.oficio', [$c->Id, 'vista']) }}" title="Oficio" loading="lazy"></iframe>
+                        <a href="{{ route('profesor.oficio', [$c->Id, 'pdf']) }}" target="_blank" class="btn btn-ghost is-brand btn-sm mb-3"><i class="fa-solid fa-file-pdf me-1"></i> Comisión PDF</a>
+                        <iframe class="doc-frame" src="{{ route('profesor.oficio', [$c->Id, 'vista']) }}" title="Comisión" loading="lazy"></iframe>
                     </div>
                     <div class="tab-pane fade" id="tabConstancia">
                         @if ($misConst->isNotEmpty())
@@ -100,7 +102,7 @@
                                     </div>
                                 @endforeach
                             </div>
-                            @if ($c->IdEstado == 3)
+                            @if ($c->IdEstado == 3 && !$c->esta_cerrada)
                                 <button type="button" class="btn btn-ghost is-danger btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#modalRefutar"><i class="fa-solid fa-gavel me-1"></i> Refutar constancia</button>
                             @endif
                             <iframe id="frameConst" class="doc-frame d-none" title="Constancia"></iframe>

@@ -19,6 +19,7 @@
             <div class="col-auto">
                 @if ($usuario->foto_src)
                     <img src="{{ $usuario->foto_src }}" alt="Foto de {{ $usuario->nombre_corto }}"
+                         data-ampliar="{{ $usuario->foto_src }}" title="Clic para ampliar"
                          class="rounded-circle object-fit-cover" width="112" height="112">
                 @else
                     <div class="rounded-circle bg-primary-subtle text-primary-emphasis d-flex align-items-center justify-content-center fs-1 fw-semibold"

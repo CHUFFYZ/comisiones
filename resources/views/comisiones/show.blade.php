@@ -3,7 +3,11 @@
 @section('title', $c->NOficio . ' · CATI')
 
 @section('content')
-@php $vigente = !$c->esta_anulada; @endphp
+@php
+    $vigente  = !$c->esta_anulada;
+    $cerrada  = $c->esta_cerrada;
+    $editable = $vigente && !$cerrada;   // se puede modificar
+@endphp
 <div class="container-fluid p-0">
 
     {{-- Encabezado y acciones --}}
@@ -13,11 +17,6 @@
             <h2 class="font-syne text-dark mt-1 mb-1"><span class="font-monospace fs-4">{{ $c->NOficio }}</span></h2>
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <span class="badge rounded-pill badge-estado {{ $c->clase_estado }}">{{ $c->estado->Nombre }}</span>
-                <!-- @if ($c->constancia)
-                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis"><i class="fa-solid fa-certificate me-1"></i>Con constancia</span>
-                @elseif ($c->IdEstado == 3)
-                    <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">Sin constancia</span>
-                @endif -->
                 @php $ec = $c->estado_constancias; @endphp
                 @if ($ec === 'completa')
                     <span class="badge rounded-pill bg-success-subtle text-success-emphasis"><i class="fa-solid fa-certificate me-1"></i>Constancias completas</span>
@@ -27,13 +26,14 @@
                     <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">Sin constancia</span>
                 @endif
                 @unless ($vigente)<span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">Anulada</span>@endunless
+                @if ($cerrada)<span class="badge rounded-pill bg-dark"><i class="fa-solid fa-lock me-1"></i>Cerrada</span>@endif
             </div>
         </div>
 
         <div class="d-flex flex-wrap gap-2">
-            <a href="{{ route('comisiones.pdf', $c->Id) }}" target="_blank" class="btn btn-ghost is-brand btn-sm"><i class="fa-solid fa-file-pdf me-1"></i> Oficio PDF</a>
+            <a href="{{ route('comisiones.pdf', $c->Id) }}" target="_blank" class="btn btn-ghost is-brand btn-sm"><i class="fa-solid fa-file-pdf me-1"></i> Comisión PDF</a>
 
-            @if ($vigente)
+            @if ($editable)
                 @puede('MSC', 'actualizar')
                     @if ($c->IdEstado > 1)
                         <form action="{{ route('comisiones.retroceder', $c->Id) }}" method="POST" class="m-0">
@@ -54,11 +54,16 @@
                         <i class="fa-solid fa-ban me-1"></i> Anular
                     </button>
                 @endpuede
-            @else
+            @elseif (!$vigente)
                 @puede('MSC', 'eliminar')
                     <form action="{{ route('comisiones.restaurar', $c->Id) }}" method="POST" class="m-0">
                         @csrf @method('PATCH')
                         <button class="btn btn-success btn-sm"><i class="fa-solid fa-rotate-left me-1"></i> Revertir anulación</button>
+                    </form>
+                    <form action="{{ route('comisiones.eliminar_definitivo', $c->Id) }}" method="POST" class="m-0" data-confirm-boton="Eliminar definitivamente"
+                          data-doble-confirm="¿Eliminar definitivamente la comisión {{ $c->NOficio }}? Se borrarán sus constancias, reportes y archivos.|||ÚLTIMA CONFIRMACIÓN: esta acción NO se puede deshacer. ¿Eliminar {{ $c->NOficio }} para siempre?">
+                        @csrf @method('DELETE')
+                        <button class="btn btn-ghost is-danger btn-sm"><i class="fa-solid fa-trash me-1"></i> Eliminar definitivamente</button>
                     </form>
                 @endpuede
             @endif
@@ -68,6 +73,14 @@
     @unless ($vigente)
         <div class="alert alert-warning">Anulada el {{ $c->DeletedAt->format('d/m/y H:i') }}. Revierte la anulación para volver a modificarla.</div>
     @endunless
+
+    @if ($cerrada)
+        <div class="alert alert-dark small d-flex align-items-center gap-2">
+            <i class="fa-solid fa-lock"></i>
+            <div>Comisión <strong>cerrada</strong> el {{ $c->CerradaAt?->format('d/m/y H:i') }} por {{ $c->cierreUsuario?->nombre_corto ?? '—' }}.
+                Solo se puede consultar; únicamente el super usuario puede reabrirla.</div>
+        </div>
+    @endif
 
     @if (in_array($c->IdEstado, [4, 5]))
         <div class="alert {{ $c->IdEstado == 4 ? 'alert-warning' : 'alert-info' }}">
@@ -99,11 +112,11 @@
                 </dl>
             </div>
             <div class="card p-4 mb-4">
-                <h5 class="font-syne mb-2">Firma del oficio</h5>
+                <h5 class="font-syne mb-2">Firma de la comisión</h5>
                 @include('firmas.partials.estado', ['d' => $c])
                 <div class="small text-body-secondary mt-2">
                     @if ($c->firmado || $c->sellado) {{ $c->DirectorCargo }} · {{ $c->DirectorNombre }}
-                    @else Pendiente: la firma y el sello los aplica Dirección o Secretaría Académica desde «Firmas y sellos». @endif
+                    @else Pendiente: la firma y el sello los aplica Dirección o Secretaría Académica desde «Firmas y sellos». Hasta entonces el profesor no la verá en su panel. @endif
                 </div>
             </div>
 
@@ -124,7 +137,7 @@
                     @if ($c->ReporteRuta)
                         <div class="d-flex gap-2">
                             <a href="{{ route('comisiones.reporte', $c->Id) }}" target="_blank" class="btn btn-brand-soft btn-sm"><i class="fa-solid fa-download me-1"></i> Abrir reporte</a>
-                            @if ($vigente && $c->IdEstado == 3)
+                            @if ($editable && $c->IdEstado == 3)
                                 @puede('MSC', 'actualizar')
                                     <button type="button" class="btn btn-ghost is-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalRechazar">
                                         <i class="fa-solid fa-rotate-left me-1"></i> Rechazar
@@ -139,12 +152,12 @@
             {{-- Documentos --}}
             <div class="card p-4">
                 <ul class="nav nav-tabs mb-3" role="tablist">
-                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabOficio" type="button">Oficio</button></li>
+                    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabOficio" type="button">Comisión</button></li>
                     <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabConstancia" type="button">Constancia</button></li>
                 </ul>
                 <div class="tab-content">
                     <div class="tab-pane fade show active" id="tabOficio">
-                        <iframe class="doc-frame" src="{{ route('comisiones.vista', $c->Id) }}" title="Oficio" loading="lazy"></iframe>
+                        <iframe class="doc-frame" src="{{ route('comisiones.vista', $c->Id) }}" title="Comisión" loading="lazy"></iframe>
                     </div>
                     <div class="tab-pane fade" id="tabConstancia">
                         @php
@@ -158,7 +171,7 @@
                                     <input class="form-check-input" type="checkbox" id="selTodasK">
                                     <label class="form-check-label small" for="selTodasK">Seleccionar todas</label>
                                 </div>
-                                @if ($vigente)
+                                @if ($editable)
                                     @puede('MSC', 'actualizar')
                                         <button type="button" class="btn btn-ghost btn-sm" data-accion-sel="modalConstancia"><i class="fa-solid fa-pen me-1"></i> Modificar seleccionadas</button>
                                     @endpuede
@@ -187,7 +200,7 @@
                         @endif
 
                         @if ($pendientes->isNotEmpty())
-                            @if ($vigente && $c->IdEstado == 3)
+                            @if ($editable && $c->IdEstado == 3)
                                 @puede('MSC', 'actualizar')
                                     <form action="{{ route('constancias.store', $c->Id) }}" method="POST" class="border rounded-3 p-3">
                                         @csrf
@@ -212,7 +225,7 @@
                                     </form>
                                 @endpuede
                             @else
-                                <p class="small text-body-secondary mb-0">Se pueden generar cuando la comisión esté finalizada.</p>
+                                <p class="small text-body-secondary mb-0">{{ $cerrada ? 'La comisión está cerrada.' : 'Se pueden generar cuando la comisión esté finalizada.' }}</p>
                             @endif
                         @elseif ($c->constancias->isEmpty())
                             <div class="text-center py-5 text-body-secondary">
@@ -236,6 +249,7 @@
 </div>
 
 {{-- Modales --}}
+@if ($editable)
 @puede('MSC', 'eliminar')
 <div class="modal fade" id="modalAnular" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -312,6 +326,7 @@
 </div>
 @endif
 @endpuede
+@endif
 
 @if ($errors->any() && !$errors->has('general'))
 @push('scripts')

@@ -94,7 +94,7 @@ class ReporteController extends Controller
     private function comisiones(Request $r): array
     {
         $esSU = $this->acc->esSuperUsuario($this->actor($r));
-        $cols = ['Oficio', 'Asunto', 'Tipo', 'Profesores', 'Fechas', 'Estado', 'Constancia'];
+        $cols = ['Comisión', 'Asunto', 'Tipo', 'Profesores', 'Fechas', 'Estado', 'Constancia'];
         if ($esSU) array_unshift($cols, 'Facultad');
 
         $filas = $this->baseComisiones($r)->get()->map(function ($c) use ($esSU) {

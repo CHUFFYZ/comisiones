@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'gestion.usuarios' => GestionUsuarios::class,
         ]);
         $middleware->appendToGroup('web', ActualizarConexion::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\ProcesoLargo::class); // procesos que terminan aunque se cierre la ventana
         $middleware->appendToGroup('web', SimularUsuario::class); // después de ActualizarConexion
         $middleware->redirectUsersTo(fn () => auth()->user()?->Rol === 'Profesor'
             ? route('profesor.panel')
